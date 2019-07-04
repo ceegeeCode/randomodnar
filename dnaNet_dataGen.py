@@ -9,7 +9,7 @@ Created on Tue May 14 15:01:36 2019
 '''
 Usage:
     
-I'll write some more but: the main functions right now are
+The main functions right now are
 
 readGenome
 encodeGenome
@@ -17,7 +17,9 @@ genSamplesForDynamicSampling_I
 
 and (for language models)
 genSamplesDirectlyFromGenome
-    
+ 
+
+For input/output see their doc-strings. What they do:    
 
 readGenome: reads in a .fa formatted file. The human genome assembly hg19.fa, for instance. This
 be downloaded via http://hgdownload.cse.ucsc.edu/downloads.html#human (it's explained there how, it's
@@ -714,6 +716,43 @@ def readGenome(fileName,
                outputGenomeString_b =0,
                randomChromo_b = 0, 
                avoidChromo = []):
+    
+    '''
+    Input:
+       fileName: path to genome file (.fa format expected)
+       exonicInfoBinaryFileName: file containing exonic information for all positions in the genomic file (fileName)
+       chromoNameBound = 10: this integer sets a bound on the name-length of the chromosomes to be read in (In some genome files 
+       (e.g hg19.fa) "extra" chromosomes are included, typically having names longer than the "true" chromos.)
+       startAtPosition: first position in genome seq to read in
+       endAtPosition: last position in genome seq to read in
+       outputAsDict_b: if 1 the output is a dictionary mapping each (covered) chromo to the read-in sequence; else (if 0) 
+       the output is the read-in sequence as a string 
+       randomChromo_b: if 1 the seq of a randomly chosen chromo is read in  
+       avoidChromo: this list contains names of chromos to be avoided (e.g. sex chromo's, mitochondrial)
+        
+    Output:
+        
+        If outputAsDict_b = 0: a tuple of two strings and two lists: Xall, X, Xrepeat, Xexonic
+        
+        where
+        Xall: genome string in capital letters (ie no repeat masking)
+        X: genome string as it is (ie with repeat masking, if exists in input file)
+        Xrepeat: list of 0/1 corr to genome string/positions; 1 if position is a repeat, 0 else
+        Xexonic: list of exonic-codes corr to genome string/positions; e.g 0 if position is intergenic, 1 if exonic, 2 if intronic   
+        
+        If outputAsDict_b = 1: a tuple of five dictionaries: XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
+        
+        each mapping a chromo to its sequence (or whatever was loaded in of it) or list of annotations. the first four
+        correspond to the strings/listsoputput for outputAsDict_b = 0:
+        
+        XchrAllDict: see Xall
+        XchrDict: see X
+        XchrRepeatDict: see Xrepeat
+        XchrExonicDict: see Xexonic
+        XchrNsDict: for each chromo seq read in (key), a list of two strings: the heading N's and the trailing N's (if any)
+        of the seq read in.
+        
+    '''
 
     
     XexonicChromo = '' #to contain the full sequence of all 0/1 exonic indicators for (a desired part of) a chromo
@@ -1235,11 +1274,18 @@ def encodeGenome(fileName,
     
     
     Outputs: structure of the output is
-    dna-sequence content, repeat-information content
+    dna-sequence content, dna-sequence content w repeat masking, repeat-information content, exonic-information content 
+    
+    and if output as dictionaries(mapping chromo to:)
+    dna-sequence content, dna-sequence content w repeat masking, repeat-information content, exonic-information content, heading-trailing N'c content
+
+    
+    Inputs: (see also fct readGenome)
     
     outputAsDict_b: if 1 the dna-sequence content of the output consists in 
     a dictionary mapping each chromosome to its sequence; if 0 the complete 
     dna-sequence concatenated from the choromosomes' seqeuences is output
+    
     outputEncoded_b: if 0 the dna-sequence content output consists of an array 
     of encoded letters in the genome's sequence order (or a dictionary mapping 
     each chromosome to that array); if = 1 the letters (alphabet
@@ -1250,7 +1296,7 @@ def encodeGenome(fileName,
     codeG = [0,0,1,0]
     codeT = [0,0,0,1]
     
-    This conversion is case insensitive.
+    This conversion is case insensitive (ie repeat masking is not encoded).
     
     outputGenomeString_b: if outputEncoded_b == 1 the genome string will be 
     output (as third part of output tuple) when setting this parameter 
@@ -1261,6 +1307,10 @@ def encodeGenome(fileName,
     a letter is lower case, it is regarded as belonging to a repeat (see 
     ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/README.txt), and a 1 is recorded
     at that position; else a 0 is recorded (for not belonging to a repeat).
+    
+    The output's exonic-information consists in a 0/1/2 indicator (or another triple
+    for annotating intergenic/exonic/intronic) for each position in the genome 
+    (sharing index with the dna-sequence content).
     
     '''
     
@@ -2550,7 +2600,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
                      getFrq_b = 0,
                      augmentWithRevComplementary_b = 1
                      ):
-    '''Generate a set of nrSamples samples. This can be do either from an existing genome 
+    '''Generate a set of nrSamples samples. This can be done either from an existing genome 
     (set fromGenome_b = 1 and supply a file name genomeFileName) or, with fromGenome_b = 0, by 
     sampling the flanks and midpoints at random (using np.random).
     
@@ -3013,6 +3063,33 @@ def genSamplesDirectlyFromGenome(genomeString,
                inner_b = 0):
     
     
+    '''
+    Input:
+       genomeString: genome sequnece as a string (as output by readGenome) 
+       nrSamples: nr of samples to generate
+       augmentWithRevComplementary_b: if 1, generate samples for reverse complementary string too
+       flankSize: length of flank (left/right); ie 50 means a total of 100 with 50 on each side of the mid to be predicted
+       labelsCodetype: just set to 0
+       outputAsString_b: if 1 output as string 
+       outputEncodedOneHot_b: if 1 output as one-hot encoded
+       outputEncodedInt_b: if 1 output as int-encoded 
+       outputEncodedType: int-type to be used when asking for encoded 
+       getOnlyRepeats_b: if 1 fetch only smaples at repeat positions
+       repeatArray: repeat info sequnce (as output by readGenome)
+       shuffle_b: if 1 shuffle shuffleLength of the flanks (see inner_b too)
+       shuffleLength: see shuffle_b
+       inner_b: if 1 shuffle the inner part, if 0 the outer part of the flanks.
+           
+           Only one of outputAsString_b, outputEncodedOneHot_b, outputEncodedInt_b should be set to 1.
+    
+    Output: tuple X, Y
+    
+    X: the list of string-samples or numpy-array of encoded samples
+    Y: the corresponding labels (letter or encoded-letter)
+    
+    '''
+    
+    
     #Set a labels-shape depending on the labelsCodetype:
     if labelsCodetype == 0:
         
@@ -3351,7 +3428,7 @@ def genSamplesDirectlyFromGenome(genomeString,
         
     else:
         
-        print("Use one-hot or int-encoding or none")
+        print("Use one-hot or int-encoding or none (string output)")
 
     return X, Y  
 

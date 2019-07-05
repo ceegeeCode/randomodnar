@@ -21,9 +21,18 @@ parameters of the function allow to specify the model, the sampling and the trai
 
 ####################################################
 
+Import module:
+
+####################################################
+
+import dnaNet_LSTM as dnaNet
+
+
+####################################################
+
 Input data:
 
-    ####################################################
+####################################################
 
 # Human genome 
 
@@ -49,11 +58,12 @@ fileGenome = rootGenome +fileName
 
 ####################################################
 
+
 #For looking at the flow:
 nrOuterLoops = 1
 firstIterNr = 0
 nrOfRepeats = 1
-firstRepeatNr = 0 #loads in model from repeatNr 115!
+firstRepeatNr = 0 
 testDataIntervalIdTotrainDataInterval_b = 1
 nrEpochs = 1
 batchSize = 10
@@ -67,7 +77,7 @@ testDataInterval = [21000,22000]
 #For testing a set-up (check taht it runs, how long training time is ...):
 nrOuterLoops = 1
 firstIterNr = 0
-nrOfRepeats = 1
+nrOfRepeats = 5
 firstRepeatNr = 0
 testDataIntervalIdTotrainDataInterval_b = 1
 nrEpochs = 10
@@ -114,6 +124,7 @@ finalDenseLayers_b = 1
 hiddenUnits = [20]
 #Nr of lstm layers:
 nrLSTMlayers = 2
+tryAveraging_b = 1
 padding = 'valid'
 
 
@@ -139,7 +150,8 @@ avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22']
 on_binf_b = 1 
 
 
-subStr = '_forModelPlot_1Conv2LayerLstm_flanks50_win4_stride1_overlap0_dropout00'
+
+subStr = '_1Conv2LayerLstmLastAveraged_flanks50_win4_stride1_overlap0_dropout00'
 learningRate = 0.001
 modelName = 'ownSamples/human/inclRepeats/modelLSTM_' + subStr
 modelDescr = subStr
@@ -148,7 +160,7 @@ modelDescr = subStr
 #With conv layer:
 labelsCodetype = 0 #1: base pair type prediction
 usedThisModel = 'makeConv1DLSTMmodel'
-dnaNet.allInOneWithDynSampling_ConvLSTMmodel(usedThisModel = usedThisModel, labelsCodetype = labelsCodetype, nrOuterLoops = nrOuterLoops, firstIterNr = firstIterNr, nrOfRepeats = nrOfRepeats,  firstRepeatNr = firstRepeatNr, convLayers_b = 1, overlap = overlap, learningRate = learningRate, momentum = momentum,  genomeFileName = fileGenome, customFlankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, testDataIntervalIdTotrainDataInterval_b = testDataIntervalIdTotrainDataInterval_b, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval = testDataInterval,   genSamples_b = 1,  nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, lengthWindows = lengthWindows, finalDenseLayers_b = finalDenseLayers_b, hiddenUnits = hiddenUnits, nrFilters = nrFilters, padding = padding, filterStride = filterStride, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = poolStrides, optimizer = optimizer, dropoutVal = dropoutVal, dropout_b = dropout_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
+dnaNet.allInOneWithDynSampling_ConvLSTMmodel(usedThisModel = usedThisModel, labelsCodetype = labelsCodetype, nrOuterLoops = nrOuterLoops, firstIterNr = firstIterNr, nrOfRepeats = nrOfRepeats,  firstRepeatNr = firstRepeatNr, convLayers_b = 1, overlap = overlap, learningRate = learningRate, momentum = momentum,  genomeFileName = fileGenome, customFlankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, testDataIntervalIdTotrainDataInterval_b = testDataIntervalIdTotrainDataInterval_b, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval = testDataInterval,   genSamples_b = 1,  nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, lengthWindows = lengthWindows, finalDenseLayers_b = finalDenseLayers_b, hiddenUnits = hiddenUnits, nrFilters = nrFilters, padding = padding, filterStride = filterStride, tryAveraging_b= tryAveraging_b, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = poolStrides, optimizer = optimizer, dropoutVal = dropoutVal, dropout_b = dropout_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
 
 
 
@@ -189,7 +201,7 @@ from keras import utils, backend
 from keras.models import Sequential, Model
 
 #Conv1D
-from keras.layers import Conv1D, Conv2D, Input, Dense, Dropout, AveragePooling1D, MaxPooling1D, AveragePooling2D, MaxPooling2D, Flatten, Concatenate, Reshape, merge
+from keras.layers import Conv1D, Conv2D, Input, Dense, Dropout, AveragePooling1D, GlobalAveragePooling1D, MaxPooling1D, AveragePooling2D, MaxPooling2D, Flatten, Concatenate, Reshape, merge
 #Additional for LSTM
 from keras.layers import LSTM, Activation, Bidirectional, concatenate, Lambda, multiply, Add, RepeatVector, Permute, Dot
 
@@ -339,7 +351,7 @@ def makeLSTMmodel(sequenceLength, nrLayers = 1, letterShape = 4, outputSize = 4,
 
 
 
-def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, filterStride = 1, onlyConv_b = 0, nrOfParallelLSTMstacks = 1, finalDenseLayers_b = 0, sizeHidden = [10], paddingType = 'valid', outputSize = 4,  batchSize = 100, pool_b = 0, maxPooling_b = 0, poolAt = [2], dropoutConvLayers_b = 1, dropoutVal = 0.25, return_sequences=False, stateful=False):
+def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, filterStride = 1, onlyConv_b = 0, nrOfParallelLSTMstacks = 1, finalDenseLayers_b = 0, sizeHidden = [10], paddingType = 'valid', outputSize = 4,  batchSize = 100, pool_b = 0, maxPooling_b = 0, poolAt = [2], dropoutConvLayers_b = 1, dropoutVal = 0.25, return_sequences=False, stateful=False, tryAveraging_b = 0):
     '''
     network model
     flankSize = lenght of the flanking sequence (number of letters)
@@ -441,15 +453,25 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
             print("Left-hand shape after 1st LSTM ", lstm_left_1._keras_shape)
             print("Right-hand shape after 1st LSTM ",lstm_right_1._keras_shape)
             
+            
         #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)
         #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
         #
         #    print(lstm_left_2._keras_shape)
         #    print (lstm_right_2._keras_shape)
         
-        
-            lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_left_1)
-            lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_right_1)
+            if tryAveraging_b == 1:
+                
+                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)  
+                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
+                
+                lstm_left_2 = GlobalAveragePooling1D()(lstm_left_2)
+                lstm_right_2 = GlobalAveragePooling1D()(lstm_right_2)
+                
+            else:
+                
+                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_left_1)  
+                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_right_1)
             
         #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutLeft)
         #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutRight)
@@ -790,7 +812,8 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
             dropoutLastLayer_b = 0,
             nrFilters = [200, 100],
             filterStride = 1,
-            padding = 'same',  
+            padding = 'same', 
+            tryAveraging_b = 0,
             pool_b = 0,
             maxPooling_b = 0,
             poolAt = [],
@@ -1103,6 +1126,7 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
             s += 'batchSize: ' + str(batchSize) + "\n"
             s += 'dropout_b: ' + str(dropout_b) + "\n"
             s += 'dropoutVal: ' + str(dropoutVal) + "\n"
+            s += 'tryAveraging_b: ' + str(tryAveraging_b) + "\n"
             s += 'pool_b: ' +  str(pool_b) + "\n"
             s += 'maxPooling_b: ' +  str(maxPooling_b) + "\n"
             s += 'poolAt: ' +  str(poolAt) + "\n"
@@ -1152,7 +1176,7 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
                     
                     if onlyConv_b != 1 or (onlyConv_b == 1 and leftRight_b == 1):
                     
-                        net = makeConv1DLSTMmodel(sequenceLength = customFlankSize + overlap, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, onlyConv_b = onlyConv_b, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = sizeOutput,  batchSize = batchSizeReal, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
+                        net = makeConv1DLSTMmodel(sequenceLength = customFlankSize + overlap, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, onlyConv_b = onlyConv_b, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = sizeOutput,  batchSize = batchSizeReal, tryAveraging_b = tryAveraging_b, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
                 
                         usedThisModel = 'makeConv1DLSTMmodel'
                     

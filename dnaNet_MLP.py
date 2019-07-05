@@ -19,7 +19,16 @@ it and for dynamically sampling from the desired data. The parameters of the fun
 the training.
     
 
-(will add more)     
+(will add more)  
+
+####################################################
+
+Import module:
+
+####################################################
+
+import dnaNet_MLP as dnaNet
+   
 
 '''
 

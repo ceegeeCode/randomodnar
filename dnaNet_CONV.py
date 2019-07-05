@@ -1132,29 +1132,6 @@ def allInOneWithDynSampling_ConvModel_I_testOnly(nrOuterLoops = 1,
 #                        Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
 #                        Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
 #    
-#    #                    print np.sum(Xfrq)
-#    #                    print X.shape, Y.shape
-#                        
-#    #                    XsplitList = []            
-#    #                    for i in range(batchSize):
-#    #                        
-#    #                        print Xfrq[i].shape, Xconv[i].shape
-#    #                        
-#    #                        XsplitList.append([Xfrq[i], Xconv[i]])
-#    #            
-#    #                    Xsplit = np.asarray(XsplitList)        
-#    #                    
-#    #                    raw_input("Sis du er saa n..")
-#    #                    merge = Concatenate()([Xfrq,Xconv])
-#    #                    raw_input("Sis du er saa ..")
-#    #                    Xsplit = Reshape((-1,))(merge)
-#    #                    
-#    #                    print(Xsplit._keras_shape)
-#    #                    raw_input("Sis du er saa ..")
-#    
-#    #                    print Xfrq.shape, Xconv.shape
-#    #                    print np.asarray([Xfrq, Xconv]).shape
-#    #                    yield(Xsplit, Y)
 #                        yield([Xfrq, Xconv],Y)
 #                        
 #                    
@@ -1713,29 +1690,7 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
                         Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
                         Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
     
-    #                    print np.sum(Xfrq)
-    #                    print X.shape, Y.shape
-                        
-    #                    XsplitList = []            
-    #                    for i in range(batchSize):
-    #                        
-    #                        print Xfrq[i].shape, Xconv[i].shape
-    #                        
-    #                        XsplitList.append([Xfrq[i], Xconv[i]])
-    #            
-    #                    Xsplit = np.asarray(XsplitList)        
-    #                    
-    #                    raw_input("Sis du er saa n..")
-    #                    merge = Concatenate()([Xfrq,Xconv])
-    #                    raw_input("Sis du er saa ..")
-    #                    Xsplit = Reshape((-1,))(merge)
-    #                    
-    #                    print(Xsplit._keras_shape)
-    #                    raw_input("Sis du er saa ..")
-    
-    #                    print Xfrq.shape, Xconv.shape
-    #                    print np.asarray([Xfrq, Xconv]).shape
-    #                    yield(Xsplit, Y)
+
                         yield([Xfrq, Xconv],Y)
                         
                     

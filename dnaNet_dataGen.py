@@ -1240,7 +1240,7 @@ def readGenome(fileName,
             XchrNsDict[chromo] = [headingNs, trailingNs]
             
             lenXchr = len(XchrDict[chromo])  
-            print("Sis .. ?", lenXchr)
+#            print("S .. ?", lenXchr)
  
 
         return XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
@@ -1282,7 +1282,7 @@ def encodeGenome(fileName,
     
     Inputs: (see also fct readGenome)
     
-    outputAsDict_b: if 1 the dna-sequence content of the output consists in 
+    outputAsDict_b: if 1 the dna-sequence content of the output consts in 
     a dictionary mapping each chromosome to its sequence; if 0 the complete 
     dna-sequence concatenated from the choromosomes' seqeuences is output
     
@@ -2440,7 +2440,7 @@ def genSamples_II(nrSamples,
             #... and fetch the correspondning flanks:                
             genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
             if len(genString) != 2*flankSizeFrqModel:
-                print("Something's rotten, Sis, lgth of genString is: ", len(genString) )
+                print("Something's rotten, lgth of genString is: ", len(genString) )
             try:
                 predIdx = np.argmax(frqModelDict[genString])
             except KeyError:
@@ -2788,7 +2788,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
                 
                 genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
                 if len(genString) != 2*flankSizeFrqModel:
-                    print("Something's rotten, Sis, lgth of genString is: ", len(genString) )
+                    print("Something's rotten, lgth of genString is: ", len(genString) )
                 try:
                     X[i][flankSizeOut] = frqModelDict[genString]
                 except KeyError:
@@ -2981,7 +2981,7 @@ def genSamplesForDynamicSampling_II(nrSamples,
                             
             genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
             if len(genString) != 2*flankSizeFrqModel:
-                print("Something's rotten, Sis, lgth of genString is: ", len(genString) )
+                print("Something's rotten, lgth of genString is: ", len(genString) )
             try:
                 predIdx = np.argmax(frqModelDict[genString])
             except KeyError:

@@ -70,8 +70,8 @@ class randomodnar(text_problems.Text2ClassProblem):
         exonicInfoBinaryFileName = ''
         
         startAtPosition = 1000000
-        endAtPosition  = 200000000
-        flankSize = 100
+        endAtPosition  = 2000000
+        flankSize = 50
         
         #We use a int-encoding here, since we are going to trnaform it back to letters anyhow (below)
         outputAsString_b = 1
@@ -81,11 +81,11 @@ class randomodnar(text_problems.Text2ClassProblem):
         
         genomeArray, genomeString , repeatArray, exonicArray= readGenome(fileName = fileGenome, exonicInfoBinaryFileName  = exonicInfoBinaryFileName , startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputAsDict_b = 0)
         print("genome string first 100:", genomeArray[:100])
-#        input("Sille Sille ... du er skoer Topper")
+#        input("Sille ...: du er skoer, Topper")
         lGenome = len(genomeString)
         genomeSeqSourceTrain = 'Read data from whole genome (chromo\'s concatenated, if any)'
         
-        nrSamples= 10000000
+        nrSamples= 10000
         
         X, Y = genSamplesDirectlyFromGenome(genomeString = genomeString,
                                  nrSamples = nrSamples,
@@ -131,37 +131,86 @@ class randomodnar(text_problems.Text2ClassProblem):
 #                         )
         
         
-        stepSize = 1
-        for i in range(nrSamples):
-            if i%100000 == 0:
-                print("Done ", i, " samples")
-#            print(i,Y[i])
-#            inpList = map(invIntLetter, X[i])
-            #we make a list of overlapping or of disjoint words:
-            #overlapping:
-#            inp = ''
-#            for j in range(len(X[i])-5):
-#                for k in range(5):
-#                    inp += X[i][(j+k):(j+1+k)]
-##                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
-#                inp += ' '
+        
+        classProblem_b = 1 #KEEP THIS
+        if classProblem_b == 1:
             
-            #disjoint:
-            inp = ''
-            for j in range(0, len(X[i]),stepSize):
-                inp += X[i][j:(j+stepSize)]
-#                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
-                inp += ' '
+            stepSize = 1
+            for i in range(nrSamples):
+                if i%100000 == 0:
+                    print("Done ", i, " samples")
+    #            print(i,Y[i])
+    #            inpList = map(invIntLetter, X[i])
+                #we make a list of overlapping or of disjoint words:
+                #overlapping:
+    #            inp = ''
+    #            for j in range(len(X[i])-5):
+    #                for k in range(5):
+    #                    inp += X[i][(j+k):(j+1+k)]
+    ##                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
+    #                inp += ' '
                 
-#            out = invIntLetter(Y[i])
-            out = intLetter(Y[i]) #class labels should be integers, not letters
-#            print(inp, out)
-#            out = invNumpyIntInt(Y[i])
-#            print(out)
-#            out = Y[i]
-            
-            yield {
-                  "inputs": inp,
-                  "label": out
-              }
+                #disjoint:
+                inp = ''
+                for j in range(0, len(X[i]),stepSize):
+                    if j == flankSize -1:
+                        inp += 'M' #mask
+                    else:
+                        inp += X[i][j:(j+stepSize)]
+    #                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
+                    inp += ' '
+                    
+    #            out = invIntLetter(Y[i])
+                out = intLetter(Y[i]) #class labels should be integers, not letters
+    #            print(inp, out)
+    #            out = invNumpyIntInt(Y[i])
+    #            print(out)
+    #            out = Y[i]
+                
+                yield {
+                      "inputs": inp,
+                      "label": out
+                  }
+                
+        else: #regarded as seq-to-seq with mid masked
 
+            stepSize = 1
+            for i in range(nrSamples):
+                if i%1000 == 0:
+                    print("Done ", i, " samples")
+    #            print(i,Y[i])
+    #            inpList = map(invIntLetter, X[i])
+                #we make a list of overlapping or of disjoint words:
+                #overlapping:
+    #            inp = ''
+    #            for j in range(len(X[i])-5):
+    #                for k in range(5):
+    #                    inp += X[i][(j+k):(j+1+k)]
+    ##                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
+    #                inp += ' '
+                
+                #disjoint:
+                inp = ''
+                out = ''
+                for j in range(0, len(X[i]),stepSize):
+                    if j == flankSize -1:
+                        inp += 'M' #mask
+                        out += Y[i]
+                    else:
+                        letter = X[i][j:(j+stepSize)]
+                        inp += letter
+                        out += letter
+                        
+    #                    inp += invIntLetter(X[i][(j+k):(j+1+k)])
+                    inp += ' '
+                    out += ' '
+                
+                if i%1000 == 0:
+                    print("Input sample i ", i, inp )
+                    print("Output sample i ", i, out )
+                    
+                
+                yield {
+                      "inputs": inp,
+                      "targets": out
+                  }

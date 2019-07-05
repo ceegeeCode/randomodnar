@@ -19,7 +19,123 @@ it and for dynamically sampling from the desired data. The parameters of the fun
 the training.
     
 
-(will add more)     
+####################################################
+
+Input data:
+
+####################################################
+
+# Human genome 
+
+#rootGenome = r"/Users/newUser/Documents/clouds/Sync/Bioinformatics/various_python/DNA_proj/data/human/"
+
+#On binf servers:
+rootGenome = r"/isdata/kroghgrp/krogh/scratch/db/hg19/"
+fileName = r"hg19.fa"
+fileGenome = rootGenome +fileName
+
+#single chromo
+rootGenome = r"/isdata/kroghgrp/tkj375/data/DNA/human/hg19/"
+fileName = r"hg19_chr10.fa"
+fileGenome = rootGenome +fileName
+
+
+
+####################################################
+
+#Set up training schedule, model and run:
+
+####################################################
+
+#for short test run (eg to see how long training takes)
+nrOuterLoops = 2
+nrOfRepeats = 2
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 3
+batchSize = 100
+stepsPerEpoch = 500
+trainDataIntervalStepSize = 2000000
+trainDataInterval = [0,5000000]
+nrTestSamples = 100000 
+testDataInterval = [10000000,10500000]
+
+
+#In anger:
+nrOuterLoops = 1
+nrOfRepeats = 100
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 100
+batchSize = 500
+stepsPerEpoch = 100
+trainDataIntervalStepSize = 0
+trainDataInterval = [0,3000000000]
+nrTestSamples = 1000000
+testDataInterval = [0,0]
+
+
+#A small test model
+learningRate = 0.001
+pool_b = 0
+poolAt = [1, 3]
+maxPooling_b = 0
+poolStrides = 1
+lengthWindows = [3, 3]
+nrFilters = [64, 64] 
+padding = 'valid'
+#Final dense layers:
+hiddenUnits = [50] 
+onlyOneRandomChromo_b = 0
+avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22'] 
+on_binf_b = 1
+str = '2LayersFlat3_1Dense50_learningRate001_padValid_noPool_augWithCompl'
+modelName = 'ownSamples/human/inclRepeats/Conv1d_' + str + '_50_units1Hidden'  
+modelDescr = str+'_50_units1Hidden'
+
+
+
+#The larger model
+learningRate = 0.001
+pool_b = 0
+poolAt = [1, 3]
+maxPooling_b = 0
+poolStrides = 1
+lengthWindows = [3, 3,  6, 6, 9, 9]
+nrFilters = [64, 64, 96, 96, 128, 128] 
+padding = 'valid'
+sizeOutput=4
+#final dense layers:
+hiddenUnits = [100, 50]
+onlyOneRandomChromo_b = 0
+#??
+avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22'] 
+on_binf_b = 1
+str = '6LayersRising3To9_2Dense100_50_learningRate001_padValid_noPool_augWithCompl'
+modelName = 'ownSamples/human/inclRepeats/Conv1d_' + str + '_50_units1Hidden'  
+modelDescr = str+'_50_units1Hidden'
+
+
+
+#Ex/Including results from frq model:
+dynSamplesTransformStyle_b = 0
+inclFrqModel_b = 0
+insertFrqModel_b = 0
+rootFrq = '/isdata/kroghgrp/tkj375/various_python/DNA_proj/results_frqModels/human/'
+#file = "frqModel_chr10_k4.txt"
+file = "frqModel_k5.txt"
+frqModelFileName = rootFrq + file
+flankSizeFrqModel = 5
+exclFrqModelFlanks_b = 0
+augmentWithRevComplementary_b = 1
+dropoutVal = 0.02 #corr's to 1 unit
+dropoutLastLayer_b = 1
+pool_b = pool_b
+maxPooling_b = maxPooling_b
+optimizer = 'ADAM'
+momentum = 0.1 #default, but we use Adam here, so the value here isn't used
+learningRate = learningRate
+
+#Run training/testing:
+dnaNet.allInOneWithDynSampling_ConvModel_I(nrOuterLoops = nrOuterLoops, firstIterNr = 0, nrOfRepeats = nrOfRepeats, firstRepeatNr = 0, testDataIntervalIdTotrainDataInterval_b = testDataIntervalIdTotrainDataInterval_b, dynSamplesTransformStyle_b = dynSamplesTransformStyle_b, learningRate = learningRate, momentum = momentum,  modelIs1D_b = 1, genomeFileName = fileGenome, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval0 = testDataInterval, genSamplesFromRandomGenome_b = 0,  genSamples_b = 1,  lengthWindows = lengthWindows, hiddenUnits = hiddenUnits, nrFilters = nrFilters,  padding = padding, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = poolStrides, dropoutVal = dropoutVal, dropoutLastLayer_b = dropoutLastLayer_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
 
    
 

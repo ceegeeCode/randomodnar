@@ -19,8 +19,142 @@ the function calls the code for building the model, for compiling it and for dyn
 parameters of the function allow to specify the model, the sampling and the training.
     
 
+####################################################
 
-(will add more)    
+Input data:
+
+    ####################################################
+
+# Human genome 
+
+#rootGenome = r"/Users/newUser/Documents/clouds/Sync/Bioinformatics/various_python/DNA_proj/data/human/"
+
+#On binf servers:
+#single chromo
+rootGenome = r"/isdata/kroghgrp/tkj375/data/DNA/human/hg19/"
+fileName = r"hg19_chr10.fa"
+fileGenome = rootGenome +fileName
+
+
+#rootGenome = r"/isdata/kroghgrp/krogh/scratch/db/hg19/"
+rootGenome = r"/isdata/kroghgrp/tkj375/data/DNA/human/hg19/"
+fileName = r"hg19.fa"
+fileGenome = rootGenome +fileName
+
+
+
+####################################################
+
+#Set up training schedule, model and run:
+
+####################################################
+
+#For looking at the flow:
+nrOuterLoops = 1
+firstIterNr = 0
+nrOfRepeats = 1
+firstRepeatNr = 0 #loads in model from repeatNr 115!
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 1
+batchSize = 10
+stepsPerEpoch = 10
+trainDataIntervalStepSize = 200
+trainDataInterval = [20000,21000]
+nrTestSamples = 10
+testDataInterval = [21000,22000]
+
+
+#For testing a set-up (check taht it runs, how long training time is ...):
+nrOuterLoops = 1
+firstIterNr = 0
+nrOfRepeats = 1
+firstRepeatNr = 0
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 10
+batchSize = 500
+stepsPerEpoch = 100
+trainDataIntervalStepSize = 2000000
+trainDataInterval = [00000000,10000000]
+nrTestSamples = 500000
+testDataInterval = [10000000,12000000]
+
+#In anger:
+nrOuterLoops = 1
+firstIterNr = 0
+nrOfRepeats = 500
+firstRepeatNr = 116 #loads in model from repeatNr 115!
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 100
+batchSize = 500
+stepsPerEpoch = 100
+trainDataIntervalStepSize = 0 #3000000000
+trainDataInterval = [0,3000000000]
+nrTestSamples = 1000000
+testDataInterval = [10000000,12000000]
+
+
+
+#Modelling spec's
+exonicInfoBinaryFileName  = ''
+inclFrqModel_b = 0
+insertFrqModel_b = 0
+customFlankSize = 50
+overlap = 0
+pool_b = 0
+poolAt = [1, 3]
+maxPooling_b = 0
+poolStrides = 1
+lengthWindows = [4]
+nrFilters = [256] 
+filterStride = 1
+#parallel LSTMs:
+nrOfParallelLSTMstacks = 1
+#Final dense layers:
+finalDenseLayers_b = 1
+hiddenUnits = [20]
+#Nr of lstm layers:
+nrLSTMlayers = 2
+padding = 'valid'
+
+
+#set-up
+dynSamplesTransformStyle_b = 0
+inclFrqModel_b = inclFrqModel_b
+insertFrqModel_b = insertFrqModel_b
+rootFrq = '/isdata/ßroghgrp/tkj375/various_python/DNA_proj/results_frqModels/human/'
+file = "frqModel_k5.txt"
+frqModelFileName = rootFrq + file
+flankSizeFrqModel = 5
+exclFrqModelFlanks_b = 0
+augmentWithRevComplementary_b = 0
+dropout_b = 0
+dropoutVal = 0.0
+pool_b = pool_b
+maxPooling_b = maxPooling_b
+optimizer = 'ADAM'
+momentum = 0.1 #default, but we use Adam here, so the value here isn't used
+#learningRate = learningRate
+onlyOneRandomChromo_b = 0
+avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22'] 
+on_binf_b = 1 
+
+
+subStr = '_forModelPlot_1Conv2LayerLstm_flanks50_win4_stride1_overlap0_dropout00'
+learningRate = 0.001
+modelName = 'ownSamples/human/inclRepeats/modelLSTM_' + subStr
+modelDescr = subStr
+
+
+#With conv layer:
+labelsCodetype = 0 #1: base pair type prediction
+usedThisModel = 'makeConv1DLSTMmodel'
+dnaNet.allInOneWithDynSampling_ConvLSTMmodel(usedThisModel = usedThisModel, labelsCodetype = labelsCodetype, nrOuterLoops = nrOuterLoops, firstIterNr = firstIterNr, nrOfRepeats = nrOfRepeats,  firstRepeatNr = firstRepeatNr, convLayers_b = 1, overlap = overlap, learningRate = learningRate, momentum = momentum,  genomeFileName = fileGenome, customFlankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, testDataIntervalIdTotrainDataInterval_b = testDataIntervalIdTotrainDataInterval_b, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval = testDataInterval,   genSamples_b = 1,  nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, lengthWindows = lengthWindows, finalDenseLayers_b = finalDenseLayers_b, hiddenUnits = hiddenUnits, nrFilters = nrFilters, padding = padding, filterStride = filterStride, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = poolStrides, optimizer = optimizer, dropoutVal = dropoutVal, dropout_b = dropout_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
+
+
+
+#Only LSTM:
+labelsCodetype = 1 #1: base pair prediction
+dnaNet.allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = labelsCodetype, convLayers_b = 0, nrLSTMlayers = nrLSTMlayers, overlap = overlap, learningRate = learningRate, momentum = momentum,  genomeFileName = fileGenome, customFlankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval = testDataInterval,   genSamples_b = 1,   lengthWindows = lengthWindows, hiddenUnits = hiddenUnits, nrFilters = nrFilters,  padding = padding, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = 1, optimizer = optimizer, dropoutVal = dropoutVal, dropout_b = dropout_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
 
 '''
 

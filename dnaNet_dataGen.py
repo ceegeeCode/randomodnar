@@ -56,6 +56,7 @@ from random import shuffle
 #codeC = np.array([0,0,1,0])
 #codeT = np.array([0,0,0,1])
 
+VERBOSE = False  # used to control really verbose print statements
 
 '''
 AK's encoding:
@@ -966,10 +967,6 @@ def readGenome(fileName,
         
         return Xall, X, Xrepeat, Xexonic
 
-
-
-
-
     else: #outputAsDict_b != 0:
     
         #If desired we only read in data from one randomly chosen chromosome
@@ -1246,6 +1243,492 @@ def readGenome(fileName,
         return XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
 
 
+def fastReadGenome(fileName, 
+               exonicInfoBinaryFileName = '',
+               chromoNameBound = 10, 
+               startAtPosition = 0,
+               endAtPosition = int(1e26), #some gigantic number
+               outputAsDict_b = 0,
+               outputGenomeString_b =0,
+               randomChromo_b = 0, 
+               avoidChromo = []):
+    
+    '''
+    TODO: Optimise the implementation when outputAsDict_b = 1
+
+    This rewrite combines two previously separate steps if outputAsDict_b == 0.
+
+    Input:
+       fileName: path to genome file (.fa format expected)
+       exonicInfoBinaryFileName: file containing exonic information for all positions in the genomic file (fileName)
+       chromoNameBound = 10: this integer sets a bound on the name-length of the chromosomes to be read in (In some genome files 
+       (e.g hg19.fa) "extra" chromosomes are included, typically having names longer than the "true" chromos.)
+       startAtPosition: first position in genome seq to read in
+       endAtPosition: last position in genome seq to read in
+       outputAsDict_b: if 1 the output is a dictionary mapping each (covered) chromo to the read-in sequence; else (if 0) 
+       the output is the read-in sequence as a string 
+       randomChromo_b: if 1 the seq of a randomly chosen chromo is read in  
+       avoidChromo: this list contains names of chromos to be avoided (e.g. sex chromo's, mitochondrial)
+        
+    Output:
+        
+        If outputAsDict_b = 0: a tuple of two strings and two lists: Xall, X, Xrepeat, Xexonic
+        
+        where
+        Xall: genome string in capital letters (ie no repeat masking)
+        X: genome string as it is (ie with repeat masking, if exists in input file)
+        Xrepeat: list of 0/1 corr to genome string/positions; 1 if position is a repeat, 0 else
+        Xexonic: list of exonic-codes corr to genome string/positions; e.g 0 if position is intergenic, 1 if exonic, 2 if intronic   
+        
+        If outputAsDict_b = 1: a tuple of five dictionaries: XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
+        
+        each mapping a chromo to its sequence (or whatever was loaded in of it) or list of annotations. the first four
+        correspond to the strings/listsoputput for outputAsDict_b = 0:
+        
+        XchrAllDict: see Xall
+        XchrDict: see X
+        XchrRepeatDict: see Xrepeat
+        XchrExonicDict: see Xexonic
+        XchrNsDict: for each chromo seq read in (key), a list of two strings: the heading N's and the trailing N's (if any)
+        of the seq read in.
+        
+    '''
+
+    startAtPosition = int(startAtPosition)
+    endAtPosition = int(endAtPosition)
+    
+    XexonicChromo = '' #to contain the full sequence of all 0/1 exonic indicators for (a desired part of) a chromo
+    Xall = '' #to contain the full sequence of all letters in the read-in genome
+    XexonicAll = '' #to contain the full sequence of all 0/1 exonic indicators in the read-in genome
+    X = '' #to only contain the ACGT's of the genome
+    Xrepeat = [] #to contain the indicator of a position being in a repeat or not
+    Xexonic = [] #to contain the indicator of a position being exonic or not
+    Xchr = '' #to only contain the ACGT's in one chromosome of the read-in genome
+    XchrExonic = '' #to only contain the exonic-info in one chromosome of the read-in genome
+    XchrRepeat = [] #to contain the indicator of a position being in a repeat or not
+    XchrExonic = [] #to contain the indicator of a position being exonic or not
+    XchrAllDict = {} #dict to map: each chromosome to its sequence
+    XchrExonicAllDict = {} #dict to map: each chromosome to its exonic-info sequence
+    XchrDict = {} #dict to map: each chromosome to list [its length, sequence(only ACGT's)]
+    XchrRepeatDict = {} #repeat info corr to XchrDict
+    XchrExonicDict = {} #exonic info corr to XchrDict
+    XchrNsDict = {} #to collect the number of heading,trailing ends for each chromo
+    lineCnt = 0
+    lenXall = 0
+    lenX = 0
+    lenXchrAll = 0
+    lenXchr = 0
+    
+    print("Fast reading in genome data ... ")
+    print("Only considering data following fasta header lines (: chromo names \n for eucaryots) of length < %d" %  chromoNameBound)
+
+
+
+    lenChr = 0
+    chromoList = []
+    exonicInfoList = []
+    currChromo = ''
+    handle = open(fileName)
+    accumulatedLength = 0
+    if outputAsDict_b == 0:
+        # Loop through the file to find the diff chromo's, their lengths and check if the exonic-info seq's match in length
+        while True:
+            lines = handle.readlines(100000)  # read in chunks of 100,000 lines http://effbot.org/zone/readline-performance.htm 
+            if not lines:
+                break  # no more lines to read
+
+            for line in lines:
+            
+                v = line.strip()
+
+                if lineCnt == 0:
+                    print("Genome data file 1st line:\n ", line)
+                
+                #skip lines with a '>'; these header lines will preceed the dna-seq
+                #or the dna-seq for each chromosome 
+                if '>' in v:
+                    # only check the length of line when necessary
+                    if len(v[1:]) < chromoNameBound:  
+                    
+                        if currChromo != '':
+                            chromoList.append([currChromo, lenChr])    
+                    
+                        currChromo = v[1:]
+                        print("Found data for this chromosome: %s" % currChromo)
+                        lenChr = 0
+                        posInChr = 0
+                    
+                        if exonicInfoBinaryFileName != '':                   
+                            #get the exonic info and find the content for this chromo:
+                            exonicInfoFile = open(exonicInfoBinaryFileName, 'r')
+                            hit_b = 0
+                            for row in exonicInfoFile:
+        #                        print row[:20]
+                                if row != line:
+                                    continue
+                                else:
+                                    hit_b = 1
+        #                            print "Hit!"
+                                    break
+                            #The exonic info for the chromo is now at the following line:
+                            if hit_b == 1:
+                                XexonicChromo = exonicInfoFile.next()
+                            
+                            exonicInfoList.append([currChromo, len(XexonicChromo)])                            
+                        else: #if no exon-info file was provided, we use 0:
+                            print("OBS: no file containing exonic info was provided, so exonic status is set to 0 throughout!")
+                            for i in range(lenXall, endAtPosition +1):
+                                XexonicChromo += str(0)
+                else:
+                    thisLength = len(v)
+                    lenChr += thisLength
+                    accumulatedLength += thisLength
+                    posInChr += thisLength
+                    if accumulatedLength >= startAtPosition:                                                
+                        if accumulatedLength <= endAtPosition:
+                            Xall += v
+                            XexonicAll += XexonicChromo[(posInChr - thisLength):posInChr]
+                    #            print "Xall at %d: %s" % (lineCnt, Xall)
+                    #            if lineCnt ==2:
+                    #                return 
+                            lenXall += len(v)
+                        else:
+                            break
+                        
+                lineCnt += 1 
+
+        handle.close()
+
+        #record for lastly passed chromo too:
+        chromoList.append([currChromo, lenChr])    
+                
+        print(chromoList)
+        print(exonicInfoList)
+        
+        print("Length of genome sequence read in:%d" % lenXall)
+        print("Length of exonic-info sequence read in:%d" % len(XexonicAll))
+        if lenXall != len(XexonicAll):
+            input("Warning: lengths of exonic info and dna-seq differ!")
+        
+        #not all letters are ACGT!:
+        for i in range(lenXall):
+            if Xall[i] == 'A':
+                X += 'A'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'T':
+                X += 'T'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'C':
+                X += 'C'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'G':
+                X += 'G'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'a':
+                X += 'A'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 't':
+                X += 'T'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'c':
+                X += 'C'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'g':
+                X += 'G'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            else:
+                # It isn't an IndexError so we shouldn't call one
+                if VERBOSE:
+                	print("Letter %s not ACGTacgt at: %d" % (Xall[i],i))
+
+        #If desired the letters will be "one-hot" encoded:
+        lenX = len(X)
+        print("Length genome sequence, only ACGT's:%d" % lenX)
+        
+        return Xall, X, Xrepeat, Xexonic
+
+    else: #outputAsDict_b != 0:  
+        # TODO: Optimise this if we ever want to use it. It has some expensive operations
+        #If desired we only read in data from one randomly chosen chromosome
+        
+        if randomChromo_b == 1:
+            
+            chromoList = []
+            
+            #First Loop through the file to find the diff chromo's:            
+            for line in open(fileName):
+                
+                v = line.strip()
+                
+                #skip line starting with a '>'; these header lines will preceed the dna-seq
+                #or the dna-seq for each chromosome 
+                if v[0] == '>' and len(v[1:]) < chromoNameBound:
+                    currChromo = v[1:]
+                    print("Found data for this chromosome: ", currChromo)
+                    chromoList.append(currChromo)
+                    continue
+            
+            lChromos = len(chromoList)
+            #pick a random one, though redo if the one found is in the avoidChromo's list:
+            getDataForThisChromOnly = ''
+            while getDataForThisChromOnly == '':
+                idx = np.random.randint(lChromos)
+                if avoidChromo.count(chromoList[idx]) == 0 and len(chromoList[idx]) < chromoNameBound:
+                    getDataForThisChromOnly = chromoList[idx]
+                    
+            print("Picked randomly this chromo from which the data will be read: %s" % getDataForThisChromOnly )
+        
+        
+        #Loop through the file to record the sequence(s):
+        currChromo = ''
+        lCurrChromo = 0
+        
+        #divide in two cases: one reading in data for each chromo and one where only
+        #data for the randomly chosen chromo is read in:
+        if randomChromo_b != 1:
+            
+            for line in open(fileName):
+                
+                v = line.strip()
+                
+                #lines starting with a '>'; these header lines will preceed the dna-seq
+                #or the dna-seq for each chromosome 
+                if v[0] == '>':
+                                    
+                    #len(currChromo) < chromoNameBound allows avoiding reading in chromo's with long names
+                    if v[1:] != currChromo and lCurrChromo < chromoNameBound: 
+                        
+                        #init/reset
+                        accumulatedLength = 0
+                        lenXchrAll = 0
+
+                        currChromo = v[1:]
+                        lCurrChromo = len(currChromo)
+                        XchrAllDict[currChromo] = ''                        
+                        print("Will read in data from chromosome: %s " % currChromo)
+
+                        if exonicInfoBinaryFileName != '':
+                            
+                            #get the exonic info and find the content for this chromo:
+                            exonicInfoFile = open(exonicInfoBinaryFileName, 'r')
+                            
+                            hit_b = 0
+                            for row in exonicInfoFile:
+    
+                                if row != line:
+                                    continue
+                                else:
+    #                                print row[:20]
+                                    hit_b = 1
+                                    break
+                            #The exonic info for the chromo is now at the following line:
+                            if hit_b == 1:
+
+                                XexonicChromo = exonicInfoFile.next()
+#                                print XexonicChromo[:50]
+                        
+                        else: #if no exon-info file was provided, we use 0:
+                            
+                            print("OBS: no file containing exonic info was provided, so exonic status is set to 0 throughout!")
+
+                            for i in range(endAtPosition +1):
+                                XexonicChromo += str(0)
+                                
+                        XchrExonicAllDict[currChromo] = ''
+ 
+
+                
+                elif lCurrChromo < chromoNameBound and accumulatedLength <= endAtPosition:  #if lineCnt > 0: #first line is header (fasta format)
+                    
+                    accumulatedLength += len(v)
+                    
+                    if accumulatedLength >= startAtPosition:
+                            
+                        XchrAllDict[currChromo] += v
+                        lenXchrAll += len(v)
+                        
+                        XchrExonicAllDict[currChromo] += XexonicChromo[(accumulatedLength - len(v)):accumulatedLength]
+                        
+                if lineCnt%1000000 == 0:
+                        print("Have read %d lines" % lineCnt)
+                
+                lineCnt += 1
+                
+                
+                
+        
+        elif randomChromo_b == 1:
+        
+            
+            
+            #Now get read in and fetch the sequence data etc
+            currChromo = ''
+            for line in open(fileName):
+                
+                v = line.strip()
+                
+                #skip line starting with a '>'; these header lines will preceed the dna-seq
+                #or the dna-seq for each chromosome 
+                if v[0] == '>':
+
+                    if v[1:] == getDataForThisChromOnly:
+
+                        currChromo = getDataForThisChromOnly
+                        
+                        #init/reset
+                        accumulatedLength = 0
+                        lenXchrAll = 0
+
+                        XchrAllDict[currChromo] = ''
+                        print("Will read in data for chromosome: ", currChromo)
+
+            
+                        #fetch the exonic info for the picked chromo (= currChromo):
+                        if exonicInfoBinaryFileName != '':
+                                    
+                            #get the exonic info and find the content for this chromo:
+                            exonicInfoFile = open(exonicInfoBinaryFileName, 'r')
+                            hit_b = 0
+                            for row in exonicInfoFile:
+                                if row != getDataForThisChromOnly:
+                                    continue
+                                elif row == getDataForThisChromOnly:
+                                    hit_b =1 
+                                    break 
+                            #The exonic info for the chromo is now at the following line:
+                            if hit_b ==1 :
+                                XexonicChromo = exonicInfoFile.next()
+                        
+                        else: #if no exon-info file was provided, we use 0:
+                            
+                            print("OBS: no file containing exonic info was provided, so exonic status is set to 0 throughout!")
+
+                            for i in range(startAtPosition, endAtPosition +1):
+                                XexonicChromo += str(0)
+                        
+                        XchrExonicAllDict[currChromo] = ''
+                        
+            
+
+
+
+                elif currChromo == getDataForThisChromOnly and accumulatedLength <= endAtPosition:
+    
+                    accumulatedLength += len(v)
+                    
+                    if accumulatedLength >= startAtPosition: 
+                        
+                        XchrAllDict[currChromo] += v
+                        lenXchrAll += len(v)
+                        
+                        XchrExonicAllDict[currChromo] += XexonicChromo[(accumulatedLength - len(v)):accumulatedLength]    
+                    
+                    if lineCnt%1000000 == 0:
+                        print("Have read %d lines" % lineCnt)
+                    
+                    lineCnt += 1
+                
+        
+        #Get length of exonic-info read in:
+        lenXchrExonicAll = 0
+        for chromo in XchrExonicAllDict.keys():
+            
+            lenXchrExonicAll += len(XchrExonicAllDict[chromo])
+            
+        print("Chromosomes: ", XchrAllDict.keys() )   
+        print("Length genome sequence read in: %d" % lenXchrAll)
+        print("Length of exonic-info sequence read in:%d" % lenXchrExonicAll)
+        if lenXchrAll != lenXchrExonicAll:
+            raw_input("Warning: lengths of exonic info and dna-seq differ!")
+
+        
+         
+        #Not all letters are ACGT! We read the seq's in to dict's holding only ACGTacgt's:
+        for chromo in XchrAllDict.keys():
+            
+            print("Now at chromosome: %s" % chromo)
+            
+            Xchr = ''
+            XchrRepeat = []
+            XchrExonic = []
+            
+            lenXchrAll = len(XchrAllDict[chromo])
+            
+            print("Length of this genome sequence:%d" % lenXchrAll)
+            
+            trailing_b = 0
+            headingNs = 0
+            trailingNs = 0
+            for i in range(lenXchrAll):
+                
+                try:
+                    if XchrAllDict[chromo][i] == 'A':            
+                        Xchr += 'A'
+                        XchrRepeat.append(0)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'T':     
+                        Xchr += 'T'
+                        XchrRepeat.append(0)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'C':    
+                        Xchr += 'C'
+                        XchrRepeat.append(0)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'G':    
+                        Xchr += 'G' 
+                        XchrRepeat.append(0)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'a':            
+                        Xchr += 'A'
+                        XchrRepeat.append(1)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 't':     
+                        Xchr += 'T'
+                        XchrRepeat.append(1)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'c':    
+                        Xchr += 'C'
+                        XchrRepeat.append(1)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    elif XchrAllDict[chromo][i] == 'g':    
+                        Xchr += 'G' 
+                        XchrRepeat.append(1)
+                        XchrExonic.append(XchrExonicAllDict[chromo][i])
+                        trailing_b = 1
+                    else:
+                        if XchrAllDict[chromo][i] == 'N':   
+                            if trailing_b == 1:
+                                trailingNs += 1
+                            else:
+                                headingNs += 1
+                except IndexError:
+                    print("Letter is %s so not ACGTacgt at: %d" % (XchrAllDict[chromo][i], i))
+                    print("... or exonic info at %d is not found; exonic info file is %s" % (i,exonicInfoBinaryFileName ))
+            XchrDict[chromo] = Xchr
+            XchrRepeatDict[chromo] = XchrRepeat
+            XchrExonicDict[chromo] = XchrExonic
+            XchrNsDict[chromo] = [headingNs, trailingNs]
+            
+            lenXchr = len(XchrDict[chromo])  
+#            print("S .. ?", lenXchr)
+ 
+
+        return XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
 
 
 def encodeGenome(fileName, 
@@ -1344,7 +1827,7 @@ def encodeGenome(fileName,
     if outputAsDict_b == 0:
         
         #Read in data from genome
-        Xall, X, Xrepeat, Xexonic = readGenome(fileName = fileName, 
+        Xall, X, Xrepeat, Xexonic = fastReadGenome(fileName = fileName, 
                exonicInfoBinaryFileName = exonicInfoBinaryFileName,
                chromoNameBound = chromoNameBound, 
                startAtPosition = startAtPosition,

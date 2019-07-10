@@ -164,6 +164,7 @@ dnaNet.allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = labelsCodetype, co
 #TENSORFLOW_FLAGS='floatX=float32,device=cuda' 
 
 import os
+import argparse
 
 #set this manually at very beginning of python session (dont set anything when using Hecaton; weill get you the GTX 1080, which has high enough compute capability)
 #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -210,9 +211,9 @@ import matplotlib.pyplot as plt
 
 from random import shuffle
 
-import frqModels as frqM
+#import frqModels as frqM
 
-import cPickle as pickle
+import pickle
 
 #import graphviz
 #import pydot
@@ -476,7 +477,6 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
         print("Shape of LSTM-stacks output ", leftAndRight._keras_shape)
     
     if finalDenseLayers_b == 1:
-        
         nrDenseLayers = len(sizeHidden)
         for i in range(nrDenseLayers):
             
@@ -802,7 +802,18 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
             modelName = 'ownSamples/CElegans/model3', 
             modelDescription = 'LSTM type ... to be filled in!',
             on_binf_b = 1, 
-            testOnly_b = 0):
+            testOnly_b = 0,
+            path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj"):
+                
+    if on_binf_b == 1:
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
+    else:
+        path = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/"
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
     
     '''
         labelsCodetype: determines whether to encode the labels as bases (0 and default), base pairs (1) 
@@ -812,17 +823,6 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
                 (inclFrqModel_b = 0).                
     '''
                 
-    if on_binf_b == 1:
-        root = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/Inputs/"
-        rootDevelopment = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/development/"
-        rootOutput = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/results_nets/"
-    else:
-        root = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/Inputs/"
-        rootDevelopment = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/development/"
-        rootOutput = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/results_nets/"
-
-
-    
     #repeat a training/testing round the set nr of times; after first round the model (from the previous round) is reloaded
 #    lTrainDataInterval = trainDataInterval[1] - trainDataInterval[0]
 #    lTestDataInterval = testDataInterval[1] - testDataInterval[0]
@@ -1325,7 +1325,7 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
         
                     #Read in the test data we avoid the chromos used for training:    
                     avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
+                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
                                                               flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  
                                                               onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
         
@@ -1362,7 +1362,6 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
                     
                     
             elif testDataIntervalIdTotrainDataInterval_b == 1: #we test using the dynamic sampling
-                                
                         
                 score, acc = net.evaluate_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
                     
@@ -1460,16 +1459,18 @@ def allInOneSampling_LSTMmodel(loss = "categorical_crossentropy",
             save_model_b = 1, 
             modelName = 'ownSamples/CElegans/model3', 
             modelDescription = 'LSTM type ... to be filled in!',
-            on_binf_b = 1):
+            on_binf_b = 1,
+            path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj"):
                 
     if on_binf_b == 1:
-        root = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/Inputs/"
-        rootDevelopment = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/development/"
-        rootOutput = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj/results_nets/"
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
     else:
-        root = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/Inputs/"
-        rootDevelopment = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/development/"
-        rootOutput = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/results_nets/"
+        path = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/"
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
 
 
 #1st version parameters:    
@@ -1675,3 +1676,140 @@ def allInOneSampling_LSTMmodel(loss = "categorical_crossentropy",
 ########### FINE
     
 #######################################################################################
+
+'''
+TODO: Make sure all arguments are properly handled by the existing code
+'''
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Train an LSTM on DNA sequences")
+    ####################################################
+    #Data
+    ####################################################
+    parser.add_argument("--path", type=str, default = '.')
+    parser.add_argument("--rootGenome", type=str, default="data/")
+    parser.add_argument("--fileName", type=str, default="hg19.fa")
+    parser.add_argument("--on_binf_b", type=int, default = 1)
+    parser.add_argument("--avoidChromo", nargs="+", default = 'chrX chrY chrM chr15 chr22') 
+    ####################################################
+    #Set up training schedule, model and run:
+    ####################################################
+    parser.add_argument("--nrOuterLoops", type=int, default=1)
+    parser.add_argument("--firstIterNr", type=int, default=0)
+    parser.add_argument("--nrOfRepeats", type=int, default=5)
+    parser.add_argument("--firstRepeatNr", type=int, default=0)
+    parser.add_argument("--testDataIntervalIdTotrainDataInterval_b", type=int, default=1)
+    parser.add_argument("--nrEpochs", type=int, default=2)
+    parser.add_argument("--batchSize", type=int, default=500)
+    parser.add_argument("--stepsPerEpoch", type=int, default=100)
+    parser.add_argument("--trainDataIntervalStepSize", type=str, default='2000000')
+    parser.add_argument("--trainDataInterval", nargs="+", type=str, default='00000000 10000000')
+    parser.add_argument("--nrTestSamples", type=int, default=500000)
+    parser.add_argument("--testDataInterval", nargs="+", default='10000000 12000000')
+    ####################################################
+    #Modelling spec's
+    ####################################################
+    parser.add_argument("--exonicInfoBinaryFileName", type=str, default = '')
+    parser.add_argument("--customFlankSize", type=int, default = 50)
+    parser.add_argument("--overlap", type=int, default = 0)
+    parser.add_argument("--pool_b", type=int, default = 0)
+    parser.add_argument("--poolAt", nargs="+", default = '1 3')
+    parser.add_argument("--maxPooling_b", type=int, default = 0)
+    parser.add_argument("--poolStrides", type=int, default = 1)
+    parser.add_argument("--lengthWindows", type=int, default = 4)
+    parser.add_argument("--nrFilters", type=int, default = 256) 
+    parser.add_argument("--filterStride", type=int, default = 1)
+    parser.add_argument("--convLayers_b", type=int, default = 1)
+    ####################################################
+    #LSTMs:
+    ####################################################
+    parser.add_argument("--nrOfParallelLSTMstacks", type=int, default = 1)
+    parser.add_argument("--nrLSTMlayers", type=int, default = 2)
+    parser.add_argument("--tryAveraging_b", type=int, default = 1)
+    parser.add_argument("--padding", type=str, default = 'valid')
+    parser.add_argument("--labelsCodetype", type=int, default = 1)  #1: base pair prediction
+    ####################################################
+    #Final dense layers:
+    ####################################################
+    parser.add_argument("--finalDenseLayers_b", type=int, default = 1)
+    parser.add_argument("--nrDenseLayers", type=int, default = 1)
+    parser.add_argument("--hiddenUnits", nargs="+", default = "20")
+    ####################################################
+    #set-up
+    ####################################################
+    parser.add_argument("--genSamples_b", type=int, default=1)
+    parser.add_argument("--shuffle_b", type=int, default=0)
+    parser.add_argument("--dynSamplesTransformStyle_b", type=int, default = 0)
+    parser.add_argument("--inclFrqModel_b", type=int, default = 0)
+    parser.add_argument("--insertFrqModel_b", type=int, default = 0)
+    parser.add_argument("--rootFrq", type=str, default = '/isdata/ßroghgrp/tkj375/various_python/DNA_proj/results_frqModels/human/')
+    parser.add_argument("--frqFilename", type=str, default = "frqModel_k5.txt")
+    parser.add_argument("--flankSizeFrqModel", type=int, default = 5)
+    parser.add_argument("--exclFrqModelFlanks_b", type=int, default = 0)
+    parser.add_argument("--augmentWithRevComplementary_b", type=int, default = 0)
+    parser.add_argument("--dropout_b", type=int, default = 0)
+    parser.add_argument("--dropoutVal", type=float, default = 0.0)
+    parser.add_argument("--optimizer", type=str, default = 'ADAM')
+    #default, but we use Adam here, so the value here isn't used
+    parser.add_argument("--momentum", type=float, default = 0.1)
+    parser.add_argument("--onlyOneRandomChromo_b", type=int, default = 0)
+    parser.add_argument("--subStr", type=str, default = '_1Conv2LayerLstmLastAveraged_flanks50_win4_stride1_overlap0_dropout00')
+    parser.add_argument("--learningRate", type=float, default = 0.001)
+    args = parser.parse_args()
+    fileGenome = args.rootGenome + args.fileName
+    frqModelFileName = args.rootFrq + args.frqFilename
+    modelName = 'models/modelLSTM_' + args.subStr
+    modelDescr = args.subStr
+
+    # Let's try to correctly parse this list of hidden unit sizes in the FC
+    print(args.hiddenUnits)
+    if type(args.hiddenUnits) is list:
+        if len(args.hiddenUnits) == 1:
+            hiddenUnits = [int(args.hiddenUnits)]
+        else: 
+            hiddenUnits = [int(x) for x in args.hiddenUnits]
+    elif type(args.hiddenUnits) is str:
+        # This is the default value
+        hiddenUnits = [int(x) for x in args.hiddenUnits.split()]
+    print(hiddenUnits)
+
+
+    allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = args.labelsCodetype, 
+                                          convLayers_b = args.convLayers_b, 
+                                          nrLSTMlayers = args.nrLSTMlayers, 
+                                          finalDenseLayers_b = args.finalDenseLayers_b,
+                                          overlap = args.overlap, 
+                                          learningRate = args.learningRate, 
+                                          momentum = args.momentum,
+                                          genomeFileName = fileGenome, 
+                                          customFlankSize = args.customFlankSize, 
+                                          inclFrqModel_b = args.inclFrqModel_b, 
+                                          insertFrqModel_b = args.insertFrqModel_b, 
+                                          exclFrqModelFlanks_b = args.exclFrqModelFlanks_b, 
+                                          frqModelFileName = frqModelFileName, 
+                                          flankSizeFrqModel = args.flankSizeFrqModel, 
+                                          modelName = modelName, 
+                                          trainDataIntervalStepSize = args.trainDataIntervalStepSize, 
+                                          trainDataInterval0 = args.trainDataInterval.split(), 
+                                          nrTestSamples = args.nrTestSamples, 
+                                          testDataInterval = args.testDataInterval,
+                                          genSamples_b = args.genSamples_b,
+                                          lengthWindows = [args.lengthWindows],
+                                          hiddenUnits = hiddenUnits,
+                                          nrFilters = [args.nrFilters],
+                                          padding = args.padding, 
+                                          pool_b = args.pool_b, 
+                                          maxPooling_b = args.maxPooling_b, 
+                                          poolAt = args.poolAt, 
+                                          poolStrides = args.poolStrides, 
+                                          optimizer = args.optimizer, 
+                                          dropoutVal = args.dropoutVal, 
+                                          dropout_b = args.dropout_b, 
+                                          augmentWithRevComplementary_b = args.augmentWithRevComplementary_b, 
+                                          batchSize = args.batchSize, 
+                                          nrEpochs = args.nrEpochs, 
+                                          stepsPerEpoch = args.stepsPerEpoch, 
+                                          shuffle_b = args.shuffle_b, 
+                                          on_binf_b = args.on_binf_b, 
+                                          path = args.path, 
+                                          testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b
+                                          )

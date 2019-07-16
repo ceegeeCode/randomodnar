@@ -2,8 +2,13 @@
 """
 Created on Mon Dec 11 15:45:17 2017
 
-@author: Christian Grønbæk
+@author: Christian Grønbæk, Desmond Elliott
 """
+
+'''
+TODO: Integrate hyperparameter searching https://github.com/maxpumperla/hyperas
+      Implement Residual Connections instead of only skip-connections
+'''
 
 '''
 Notes:
@@ -202,14 +207,16 @@ from keras import utils, backend
 from keras.models import Sequential, Model
 
 #Conv1D
-from keras.layers import Conv1D, Conv2D, Input, Dense, Dropout, AveragePooling1D, GlobalAveragePooling1D, MaxPooling1D, AveragePooling2D, MaxPooling2D, Flatten, Concatenate, Reshape, merge
+from keras.layers import Conv1D, Conv2D, Input, Dense, Dropout, AveragePooling1D, GlobalAveragePooling1D, MaxPooling1D, AveragePooling2D, MaxPooling2D, Flatten, Concatenate, Reshape, merge, GlobalMaxPooling1D
 #Additional for LSTM
-from keras.layers import LSTM, Activation, Bidirectional, concatenate, Lambda, multiply, Add, RepeatVector, Permute, Dot
+from keras.layers import LSTM, Activation, Bidirectional, concatenate, Lambda, multiply, Add, RepeatVector, Permute, Dot, Embedding, Reshape
 
 from keras.optimizers import SGD, RMSprop, Adam
 from keras.models import model_from_json
 
 from keras.utils.vis_utils import plot_model
+
+from keras.utils import to_categorical
 
 from scipy.fftpack import fft, ifft
 
@@ -236,123 +243,124 @@ from dnaNet_dataGen import * #all smpling aso is here
 
 
 ###############################
-## LSTM's
+## LSTM
 ###############################
 
-def makeLSTMmodel(sequenceLength, nrLayers = 1, letterShape = 4, outputSize = 4, batchSize = 100 , return_sequences=False, stateful=False, dropout_b = 0, dropoutVal = 0.25):
+def makeLSTMmodel(sequenceLength, nrLayers = 1, letterShape = 4, outputSize = 4, batchSize = 100 , return_sequences=False, stateful=False, hiddenUnits = [20], embedUnits = 64, LSTMUnits = 128, shareLSTMs = True, poolLSTM=None, skipConnectEmbeddings = True, dropout_emb = 0., dropout_lstm = 0., dropout_output = 0.):
+
     '''
-    network model
     sequenceLength = lenght of the sequence (number of letters)
     letterShape = shape of letter encoding, here arrays of length 4
     outputSize = the size of the output layer, here 4
+    poolLSTM = 'average' 'max' or None
+    nrLayers = number of LSTM layers in total. We reserve the last LSTM layer for skip-connecting the embeddings
+    shareLSTMs = should the parameters of the different LSTMs be shared?
     '''
 
     print('Build LSTM model...')
 
-    inputs_left = Input(shape=(sequenceLength,letterShape), batch_shape = (batchSize,sequenceLength,letterShape))
-    inputs_right = Input(shape=(sequenceLength,letterShape), batch_shape = (batchSize, sequenceLength,letterShape))
+    inputs_left = Input(shape=(sequenceLength,))
+    inputs_right = Input(shape=(sequenceLength,))
 
-#    #all but the last lstm -layer returns a sequence (of the same length as the input)
-#    for i in range(nrLayers -1):
-#
-#        inputs_left  = LSTM(letterShape, return_sequences=True, stateful=stateful)(inputs_left)
-#        inputs_right = LSTM(letterShape, return_sequences=True, stateful=stateful)(inputs_right)
-#
-#        print(inputs_left._keras_shape)
-#        print (inputs_right._keras_shape)
-    
-    if nrLayers > 1: 
-    
-        lstm_left_1  = LSTM(letterShape, return_sequences=True, stateful=stateful)(inputs_left)
-        lstm_right_1 = LSTM(letterShape, return_sequences=True, stateful=stateful)(inputs_right)
-    
-        print(lstm_left_1._keras_shape)
-        print (lstm_right_1._keras_shape)
-    
-        if dropout_b ==  1:
-            
-                lstm_left_1 = Dropout(dropoutVal)(lstm_left_1)
-                lstm_right_1 = Dropout(dropoutVal)(lstm_right_1)
-            
+    ###
+    # Word embeddings for the DNA bases
+    ###
+    embed = Embedding(letterShape, embedUnits, input_length=sequenceLength)
+    emb_left = embed(inputs_left)
+    emb_right = embed(inputs_right)
+    if dropout_emb:
+        emb_left = Dropout(dropout_emb)(emb_left)
+        emb_right = Dropout(dropout_emb)(emb_right)
+    left = emb_left
+    right = emb_right
 
-    if nrLayers > 2: 
+    ###
+    # LSTM encoding layers
+    # nrLayers - 1 because we don't necessarily want to return_sequences at the uppermost layer
+    ###
+    for j in range(nrLayers - 1):
+        if shareLSTMs:
+            # Share the LSTM across sequences
+            lstm = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)
+            left  = lstm(left)
+            right = lstm(right)
+        else:
+            left = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)(left)
+            right = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)(right)
     
-        lstm_left_2  = LSTM(letterShape, return_sequences=True, stateful=stateful)(lstm_left_1)
-        lstm_right_2 = LSTM(letterShape, return_sequences=True, stateful=stateful)(lstm_right_1)
-    
-        print(lstm_left_2._keras_shape)
-        print (lstm_right_2._keras_shape)
-    
-        if dropout_b ==  1:
-            
-                lstm_left_2 = Dropout(dropoutVal)(lstm_left_2)
-                lstm_right_2 = Dropout(dropoutVal)(lstm_right_2)
+        if dropout_lstm:
+            left = Dropout(dropout_lstm)(left)
+            right = Dropout(dropout_lstm)(right)
 
-
-    if nrLayers > 3: 
-
-        lstm_left_3  = LSTM(letterShape, return_sequences=True, stateful=stateful)(lstm_left_2)
-        lstm_right_3 = LSTM(letterShape, return_sequences=True, stateful=stateful)(lstm_right_2)
-    
-        print(lstm_left_3._keras_shape)
-        print (lstm_right_3._keras_shape)
-    
-        if dropout_b ==  1:
-            
-                lstm_left_3 = Dropout(dropoutVal)(lstm_left_3)
-                lstm_right_3 = Dropout(dropoutVal)(lstm_right_3)
-
-
-    #Define the output of the first part:
-    if nrLayers == 1:
-
-        left_firstPart = inputs_left
-        right_firstPart = inputs_right
+    if skipConnectEmbeddings:
+        # Concatenate the previous layer with the embedding. Can improve gradient flow
+        # https://arxiv.org/pdf/1701.09175
+        left = concatenate([left, emb_left])
+        right = concatenate([right, emb_right])
         
-    elif nrLayers == 2:
-        
-        left_firstPart = lstm_left_1
-        right_firstPart = lstm_right_1
+    if poolLSTM == None:
+        # Use only the final LSTM hidden state
+        # Skip-connection of the original word embeddings
+        if shareLSTMs:
+            lstm = LSTM(LSTMUnits, return_sequences=False, stateful=stateful)
+            left = lstm(left)
+            right = lstm(right)
+        else:
+            left = LSTM(LSTMUnits, return_sequences=False, stateful=stateful)(left)
+            right = LSTM(LSTMUnits, return_sequences=False, stateful=stateful)(right)
 
-    elif nrLayers == 3:
-        
-        left_firstPart = lstm_left_2
-        right_firstPart = lstm_right_2
-        
-    elif nrLayers == 4:
-        
-        left_firstPart = lstm_left_3
-        right_firstPart = lstm_right_3
-    
-    #last lstm layer:        
-    lstm_left  = LSTM(letterShape, return_sequences=False, stateful=stateful)(left_firstPart)
-    lstm_right = LSTM(letterShape, return_sequences=False, stateful=stateful)(right_firstPart)
+        if dropout_lstm:
+            left = Dropout(dropout_lstm)(left)
+            right = Dropout(dropout_lstm)(right)
+    else:    
+        # Pool the LSTM hidden states
+        if shareLSTMs:
+            # Skip-connection of the original word embeddings
+            lstm = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)
+            left  = lstm(left)  
+            right = lstm(right)
+        else:
+            left = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)(left)
+            right = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)(right)
+                
+        if dropout_lstm:
+            left = Dropout(dropout_lstm)(left)
+            right = Dropout(dropout_lstm)(right)
 
-    print("Left-hand shape after first LSTM part ", lstm_left._keras_shape)
-    print("Right-hand shape after first LSTM part ",lstm_right._keras_shape)
+        if poolLSTM is 'max':
+            left = GlobalMaxPooling1D()(left)
+            right = GlobalMaxPooling1D()(right)
+        elif poolLSTM is 'average':
+            left = GlobalAveragePooling1D()(left)
+            right = GlobalAveragePooling1D()(right)
+        else:
+            raise Exception("poolLSTM must be either 'max' or 'average'")
 
-    
-    #Concatenate the two LSTM-outputs:
-    leftAndRight = concatenate([lstm_left, lstm_right], axis=-1, name = 'concat')
-    
-    print(leftAndRight._keras_shape)
+    ###
+    # Output layer
+    ###
 
+    # Concatenate the two LSTM outputs for the fully-connected prediction layer:
+    joint = concatenate([left, right], axis=-1, name = 'concat')   
+    for i in range(len(hiddenUnits)):
+        # Create a deep output layer by stacking feed-forward neural networks
+        # hiddenUnits is a list of ints that define the number of hidden units
+        # e.g. [256, 128, 64]
+        # use he_normal initialisation with ReLU https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/He_Delving_Deep_into_ICCV_2015_paper.pdf
+        joint = Dense(hiddenUnits[i], activation='relu', kernel_initializer='he_normal')(joint)  
+        if dropout_output:
+            joint = Dropout(dropout_output)(joint)
 
     # And add a softmax on top
-    prediction = Dense(outputSize, activation='softmax')(leftAndRight)
-
-    print(prediction._keras_shape)
-
+    prediction = Dense(outputSize, activation='softmax')(joint)
     model = Model(inputs=[inputs_left, inputs_right], outputs=prediction)
-
 
     print("... build model.")
         
     return model
 
 
-
-def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, filterStride = 1, onlyConv_b = 0, nrOfParallelLSTMstacks = 1, finalDenseLayers_b = 0, sizeHidden = [10], paddingType = 'valid', outputSize = 4,  batchSize = 100, pool_b = 0, maxPooling_b = 0, poolAt = [2], dropoutConvLayers_b = 1, dropoutVal = 0.25, return_sequences=False, stateful=False, tryAveraging_b = 0):
+def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, filterStride = 1, onlyConv_b = 0, nrOfParallelLSTMstacks = 1, finalDenseLayers_b = 0, sizeHidden = [10], paddingType = 'valid', outputSize = 4,  batchSize = 100, pool_b = 0, maxPooling_b = 0, poolAt = [2], dropoutConvLayers_b = 0, dropoutVal = 0.25, return_sequences=False, stateful=False, tryAveraging_b = 0):
     '''
     network model
     flankSize = lenght of the flanking sequence (number of letters)
@@ -365,10 +373,6 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
 
     print('Build Conv1d plus LSTM model...')    
     
-
-#    inputs_left = Input(shape=(sequenceLength,letterShape), batch_shape = (batchSize,sequenceLength,letterShape))
-#    inputs_right = Input(shape=(sequenceLength,letterShape), batch_shape = (batchSize, sequenceLength,letterShape))
-
     inputs_left = Input(shape=(sequenceLength,letterShape))
     inputs_right = Input(shape=(sequenceLength,letterShape))
 
@@ -392,7 +396,6 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
         
     print("Left-hand shape after 1st convo ", convOutLeft._keras_shape)
     print("Right-hand shape after 1st convo ",convOutRight._keras_shape)
-
     
     for i in range(len(nrFilters)-1):    
     
@@ -419,8 +422,6 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
 
     print("...by!")
     
-    
-    
     print("Left-hand shape after all convo's ",convOutLeft._keras_shape)
     print("Right-hand shape after all convo's ", convOutRight._keras_shape)
     
@@ -437,77 +438,47 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
         
         print("Then the lstm part ..." )
     
-    #    lstm_left_1  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutLeft)
-    #    lstm_right_1 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutRight)
-    #
-    #    print(lstm_left_1._keras_shape)
-    #    print (lstm_right_1._keras_shape)
-    #
-    #    #Concatenate the two LSTM-outputs:
-    #    leftAndRight = concatenate([lstm_left_1, lstm_right_1], axis=-1)
+        prevLeft = convOutLeft
+        prevRight = convOutRight
+
+        for j in range(nrOfParallelLSTMstacks-1):
     
-        for j in range(nrOfParallelLSTMstacks):
-    
-            lstm_left_1  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(convOutLeft)
-            lstm_right_1 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(convOutRight)
+            lstm_left  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(prevLeft)
+            lstm_right = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(prevRight)
         
-            print("Left-hand shape after 1st LSTM ", lstm_left_1._keras_shape)
-            print("Right-hand shape after 1st LSTM ",lstm_right_1._keras_shape)
-            
-            
-        #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)
-        #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
-        #
-        #    print(lstm_left_2._keras_shape)
-        #    print (lstm_right_2._keras_shape)
+            if dropoutConvLayers_b == 1:
+                lstm_left = Dropout(dropoutVal)(lstm_left)
+                lstm_right = Dropout(dropoutVal)(lstm_right)
         
-            if tryAveraging_b == 1:
-                
-                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)  
-                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
-                
-                lstm_left_2 = GlobalAveragePooling1D()(lstm_left_2)
-                lstm_right_2 = GlobalAveragePooling1D()(lstm_right_2)
-                
-            else:
-                
-                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_left_1)  
-                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_right_1)
+            print("Left-hand shape after LSTM ", lstm_left._keras_shape)
+            print("Right-hand shape after LSTM ",lstm_right._keras_shape)
+
+            prevLeft = lstm_left
+            prevRight = lstm_right
             
-        #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutLeft)
-        #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutRight)
             
-        
-            print("Left-hand shape after 2nd LSTM ",lstm_left_2._keras_shape)
-            print ("Right-hand shape after 2nd LSTM ", lstm_right_2._keras_shape)
-            
-            #Concatenate the two LSTM-outputs:
-            leftAndRight_j = concatenate([lstm_left_2, lstm_right_2], axis=-1)
-            
-            if j == 0:
-                
-                leftAndRight = leftAndRight_j
-                
-            else: 
-                
-                leftAndRight = concatenate([leftAndRight, leftAndRight_j], axis = -1) 
-                
-        
-            print("Shape of concatenated LSTM output ", leftAndRight._keras_shape)
-            
-        
-        print("Shape of LSTM-stacks output ", leftAndRight._keras_shape)
-    
+    lstm_left  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(prevLeft)  
+    lstm_right = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(prevRight)
+    if dropoutConvLayers_b ==  1:
+        lstm_left = Dropout(dropoutVal)(lstm_left)
+        lstm_right = Dropout(dropoutVal)(lstm_right)
+
+    #Concatenate the two LSTM-outputs:
+    leftAndRight_j = concatenate([lstm_left, lstm_right], axis=-1)      
+    print("Shape of concatenated LSTM output ", leftAndRight_j._keras_shape)
+
+    prevLayer = leftAndRight_j
     if finalDenseLayers_b == 1:
         nrDenseLayers = len(sizeHidden)
         for i in range(nrDenseLayers):
+            leftAndRight = Dense(sizeHidden[i], activation='relu', kernel_initializer='he_normal')(prevLayer)
+            prevLayer = leftAndRight
+            print("Shape of dense layer ", leftAndRight._keras_shape)
             
-            leftAndRight = Dense(sizeHidden[i], activation='relu')(leftAndRight)
-            
-    print("Shape after final dense layer ", leftAndRight._keras_shape)
+    print("Shape after final dense layer ", prevLayer._keras_shape)
     
     # And add a softmax on top
-    prediction = Dense(outputSize, activation='softmax')(leftAndRight)
+    prediction = Dense(outputSize, activation='softmax')(prevLayer)
 
     print("Output shape ", prediction._keras_shape)
 
@@ -826,7 +797,15 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
             modelDescription = 'LSTM type ... to be filled in!',
             on_binf_b = 1, 
             testOnly_b = 0,
-            path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj"):
+            path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj",
+            embedUnits = 64,
+            LSTMUnits = 128,
+            skipConnectEmbeddings = False,
+            shareLSTMs = False,
+            poolLSTM = None,
+            dropout_emb = 0.,
+            dropout_lstm = 0.,
+            dropout_output = 0.):
                 
     if on_binf_b == 1:
         root = path + r"/Inputs/"
@@ -1010,6 +989,32 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
 #                Xt_right = np.flip(Xt_right, axis = 1)
 #                    
                          
+            def myIntGenerator(customFlankSize, batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype):
+               
+                while 1:
+                    X,Y = genSamplesForDynamicSampling_I(nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
+                                     genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
+                    if inclFrqModel_b == 1  and insertFrqModel_b != 1:
+            
+                        Xconv[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = X[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
+                        Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
+                        Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
+                        
+                        yield([Xfrq, Xconv],Y)
+                        
+                    
+                    elif onlyConv_b == 1 and leftRight_b == 0:
+                        
+                        yield(X,Y)
+                    
+                    else:
+                        
+                        Xleft = X[:, :(customFlankSize + overlap)].copy()
+                        Xright = X[:, (customFlankSize - overlap):].copy()
+                        #and reverse it:
+                        Xright = np.flip(Xright, axis = 1)
+
+                        yield([Xleft, Xright], to_categorical(Y))
             
             #Dynamically fetch small sample batches; this runs in an infinite loop
             #in parallel to the fit_generator call below (and stops when that is done)
@@ -1035,6 +1040,7 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
                     else:
                         
 #                        Xleft[:, :(customFlankSize+overlap), :] = X[:, :(customFlankSize + overlap) , :]
+
                         Xleft = X[:, :(customFlankSize + overlap) , :].copy()
                         Xright = X[:, (customFlankSize - overlap):, :].copy()
                         #and reverse it:
@@ -1167,8 +1173,9 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
             if n == 0 and k == 0: 
         
                 if convLayers_b == 0 and fusedWitEROmodel_b == 0:
-            
-                    net = makeLSTMmodel(sequenceLength = customFlankSize + overlap, nrLayers = nrLSTMlayers, letterShape = letterShape,  outputSize = sizeOutput, batchSize = batchSizeReal, dropout_b = dropout_b, dropoutVal = dropoutVal )
+                    if not dropout_b:
+                        dropoutVal = 0.
+                    net = makeLSTMmodel(sequenceLength = customFlankSize + overlap, nrLayers = nrLSTMlayers, letterShape = letterShape,  outputSize = sizeOutput, batchSize = batchSizeReal, hiddenUnits = hiddenUnits, embedUnits = embedUnits, LSTMUnits = LSTMUnits, dropout_emb = dropout_emb, dropout_lstm = dropout_lstm, dropout_output = dropout_output, poolLSTM = poolLSTM)
                     
                     usedThisModel = 'makeLSTMmodel'
                     
@@ -1239,10 +1246,13 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
         
             print("Compiled model ..."    )
         
-
             if testOnly_b == 0:#just means that we're running a regular trianing/testing session
 
-                history = net.fit_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps_per_epoch= stepsPerEpoch, epochs=nrEpochs, verbose=1, callbacks=None, validation_data=None, validation_steps=None, class_weight=None, max_queue_size=2, workers=1, use_multiprocessing=False,  initial_epoch=1)
+                if convLayers_b == 1:
+                    history = net.fit_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps_per_epoch= stepsPerEpoch, epochs=nrEpochs, verbose=1, callbacks=None, validation_data=None, validation_steps=None, class_weight=None, max_queue_size=2, workers=1, use_multiprocessing=False,  initial_epoch=1)
+                else:
+                    # Use a different generator if we are using an LSTM with an Embedding layer
+                    history = net.fit_generator(myIntGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps_per_epoch= stepsPerEpoch, epochs=nrEpochs, verbose=1, callbacks=None, validation_data=None, validation_steps=None, class_weight=None, max_queue_size=2, workers=1, use_multiprocessing=False,  initial_epoch=0)
            
     
                 if save_model_b == 1:
@@ -1387,7 +1397,10 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
                     
             elif testDataIntervalIdTotrainDataInterval_b == 1: #we test using the dynamic sampling
                         
-                score, acc = net.evaluate_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
+                if convLayers_b == 1:
+                    score, acc = net.evaluate_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
+                else:
+                    score, acc = net.evaluate_generator(myIntGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
                     
 
                 
@@ -1712,18 +1725,21 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default = '.')
     parser.add_argument("--rootGenome", type=str, default="data/")
     parser.add_argument("--fileName", type=str, default="hg19.fa")
-    parser.add_argument("--on_binf_b", type=int, default = 1)
+    parser.add_argument("--on_binf_b", type=int, default = 0)
     parser.add_argument("--avoidChromo", nargs="+", default = 'chrX chrY chrM chr15 chr22') 
+    parser.add_argument("--outputEncodedInt_b", type=int, default=0)
+    parser.add_argument("--labelsCodetype", type=int, default = 0)  #1: base pair prediction
     ####################################################
     #Set up training schedule, model and run:
     ####################################################
+    parser.add_argument("--model", type=str, default="Conv1DLSTM", choices=["Conv1DLSTM", "LSTM"])
     parser.add_argument("--nrOuterLoops", type=int, default=1)
     parser.add_argument("--firstIterNr", type=int, default=0)
     parser.add_argument("--nrOfRepeats", type=int, default=5)
     parser.add_argument("--firstRepeatNr", type=int, default=0)
     parser.add_argument("--testDataIntervalIdTotrainDataInterval_b", type=int, default=1)
-    parser.add_argument("--nrEpochs", type=int, default=2)
-    parser.add_argument("--batchSize", type=int, default=500)
+    parser.add_argument("--nrEpochs", type=int, default=10)
+    parser.add_argument("--batchSize", type=int, default=512)
     parser.add_argument("--stepsPerEpoch", type=int, default=100)
     parser.add_argument("--trainDataIntervalStepSize", type=str, default='2000000')
     parser.add_argument("--trainDataInterval", nargs="+", type=str, default='00000000 10000000')
@@ -1743,20 +1759,27 @@ if __name__ == "__main__":
     parser.add_argument("--nrFilters", type=int, default = 256) 
     parser.add_argument("--filterStride", type=int, default = 1)
     parser.add_argument("--convLayers_b", type=int, default = 1)
+    parser.add_argument("--padding", type=str, default = 'valid')
     ####################################################
     #LSTMs:
     ####################################################
     parser.add_argument("--nrOfParallelLSTMstacks", type=int, default = 1)
     parser.add_argument("--nrLSTMlayers", type=int, default = 2)
     parser.add_argument("--tryAveraging_b", type=int, default = 1)
-    parser.add_argument("--padding", type=str, default = 'valid')
-    parser.add_argument("--labelsCodetype", type=int, default = 1)  #1: base pair prediction
+    parser.add_argument("--embedUnits", type=int, default = 128)
+    parser.add_argument("--dropout_emb", type=float, default= 0.)
+    parser.add_argument("--LSTMUnits", type=int, default = 256)
+    parser.add_argument("--dropout_lstm", type=float, default= 0.)
+    parser.add_argument("--skipConnectEmbeddings", type=int, default = 1)
+    parser.add_argument("--shareLSTMs", type=int, default = 1)
+    parser.add_argument("--poolLSTM", type=str, default=None, choices=["max", "average", None])
     ####################################################
     #Final dense layers:
     ####################################################
     parser.add_argument("--finalDenseLayers_b", type=int, default = 1)
     parser.add_argument("--nrDenseLayers", type=int, default = 1)
     parser.add_argument("--hiddenUnits", nargs="+", default = "20")
+    parser.add_argument("--dropout_output", type=float, default = 0.)
     ####################################################
     #set-up
     ####################################################
@@ -1770,14 +1793,15 @@ if __name__ == "__main__":
     parser.add_argument("--flankSizeFrqModel", type=int, default = 5)
     parser.add_argument("--exclFrqModelFlanks_b", type=int, default = 0)
     parser.add_argument("--augmentWithRevComplementary_b", type=int, default = 0)
-    parser.add_argument("--dropout_b", type=int, default = 0)
-    parser.add_argument("--dropoutVal", type=float, default = 0.0)
+    parser.add_argument("--dropout_b", type=int, default = 1)
+    parser.add_argument("--dropoutVal", type=float, default = 0.1)
     parser.add_argument("--optimizer", type=str, default = 'ADAM')
     #default, but we use Adam here, so the value here isn't used
     parser.add_argument("--momentum", type=float, default = 0.1)
     parser.add_argument("--onlyOneRandomChromo_b", type=int, default = 0)
     parser.add_argument("--subStr", type=str, default = '_1Conv2LayerLstmLastAveraged_flanks50_win4_stride1_overlap0_dropout00')
     parser.add_argument("--learningRate", type=float, default = 0.001)
+
     args = parser.parse_args()
     fileGenome = args.rootGenome + args.fileName
     frqModelFileName = args.rootFrq + args.frqFilename
@@ -1785,21 +1809,22 @@ if __name__ == "__main__":
     modelDescr = args.subStr
 
     # Let's try to correctly parse this list of hidden unit sizes in the FC
-    print(args.hiddenUnits)
     if type(args.hiddenUnits) is list:
         if len(args.hiddenUnits) == 1:
-            hiddenUnits = [int(args.hiddenUnits)]
+            hiddenUnits = [int(args.hiddenUnits[0])]
         else: 
             hiddenUnits = [int(x) for x in args.hiddenUnits]
     elif type(args.hiddenUnits) is str:
         # This is the default value
         hiddenUnits = [int(x) for x in args.hiddenUnits.split()]
-    print(hiddenUnits)
 
-
-    allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = args.labelsCodetype, 
+    if args.model == "Conv1DLSTM":
+        args.outputEncodedInt_b = 0
+        allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = args.labelsCodetype, 
                                           convLayers_b = args.convLayers_b, 
                                           nrLSTMlayers = args.nrLSTMlayers, 
+                                          skipConnectEmbeddings = args.skipConnectEmbeddings,
+                                          shareLSTMs = args.shareLSTMs,
                                           finalDenseLayers_b = args.finalDenseLayers_b,
                                           overlap = args.overlap, 
                                           learningRate = args.learningRate, 
@@ -1820,6 +1845,7 @@ if __name__ == "__main__":
                                           lengthWindows = [args.lengthWindows],
                                           hiddenUnits = hiddenUnits,
                                           nrFilters = [args.nrFilters],
+                                          nrOfParallelLSTMstacks = args.nrOfParallelLSTMstacks,
                                           padding = args.padding, 
                                           pool_b = args.pool_b, 
                                           maxPooling_b = args.maxPooling_b, 
@@ -1835,5 +1861,59 @@ if __name__ == "__main__":
                                           shuffle_b = args.shuffle_b, 
                                           on_binf_b = args.on_binf_b, 
                                           path = args.path, 
-                                          testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b
+                                          testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b,
+                                          outputEncodedInt_b = args.outputEncodedInt_b
+                                          )
+    elif args.model == "LSTM":
+        args.convLayers_b = 0
+        args.outputEncodedInt_b = 1
+        allInOneWithDynSampling_ConvLSTMmodel(
+                                          # Paths to the files
+                                          path = args.path,
+                                          genomeFileName = fileGenome, 
+                                          labelsCodetype = args.labelsCodetype, 
+                                          modelName = modelName,
+                                          # Model hyperparameters
+                                          convLayers_b = args.convLayers_b, 
+                                          nrLSTMlayers = args.nrLSTMlayers, 
+                                          nrOfParallelLSTMstacks = args.nrOfParallelLSTMstacks,
+                                          LSTMUnits = args.LSTMUnits,
+                                          skipConnectEmbeddings = args.skipConnectEmbeddings,
+                                          shareLSTMs = args.shareLSTMs,
+                                          poolLSTM = args.poolLSTM,
+                                          embedUnits = args.embedUnits,
+                                          finalDenseLayers_b = args.finalDenseLayers_b,
+                                          hiddenUnits = hiddenUnits,
+                                          overlap = args.overlap,
+                                          dropout_b = args.dropout_b,
+                                          dropout_emb = args.dropout_emb,
+                                          dropout_lstm = args.dropout_lstm,
+                                          dropout_output = args.dropout_output,
+                                          # Optimization 
+                                          optimizer = args.optimizer, 
+                                          learningRate = args.learningRate, 
+                                          momentum = args.momentum,
+                                          # Arguments for the frqFile
+                                          inclFrqModel_b = args.inclFrqModel_b, 
+                                          insertFrqModel_b = args.insertFrqModel_b, 
+                                          exclFrqModelFlanks_b = args.exclFrqModelFlanks_b, 
+                                          frqModelFileName = frqModelFileName, 
+                                          flankSizeFrqModel = args.flankSizeFrqModel, 
+                                          # Arguments for encoding the data
+                                          outputEncodedInt_b = args.outputEncodedInt_b,
+                                          outputEncodedOneHot_b = 0,
+                                          # Arguments for defining the training and test data
+                                          customFlankSize = args.customFlankSize, 
+                                          trainDataIntervalStepSize = args.trainDataIntervalStepSize, 
+                                          trainDataInterval0 = args.trainDataInterval.split(),
+                                          nrTestSamples = args.nrTestSamples, 
+                                          testDataInterval = args.testDataInterval,
+                                          testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b,
+                                          genSamples_b = args.genSamples_b,
+                                          # Arguments for defining the training loop
+                                          nrEpochs = args.nrEpochs, 
+                                          augmentWithRevComplementary_b = args.augmentWithRevComplementary_b, 
+                                          batchSize = args.batchSize, 
+                                          stepsPerEpoch = args.stepsPerEpoch, 
+                                          shuffle_b = args.shuffle_b
                                           )

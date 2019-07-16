@@ -3,7 +3,7 @@
 """
 Created on Tue May 14 15:01:36 2019
 
-@author: Christian Grønbæk
+@author: Christian Grønbæk, Desmond Elliott
 """
 
 '''
@@ -1330,6 +1330,13 @@ def fastReadGenome(fileName,
     currChromo = ''
     handle = open(fileName)
     accumulatedLength = 0
+
+    if exonicInfoBinaryFileName == '':
+        # This operation does not need to be repeated. If the file does not exist when the script is called, it will not exist during the reading of the file
+        #if no exon-info file was provided, we use 0:
+        print("OBS: no file containing exonic info was provided, so exonic status is set to 0 from {} - {}".format(lenXall, endAtPosition+1))
+        XexonicChromo += str(0) * (endAtPosition + 1 - lenXall)
+
     if outputAsDict_b == 0:
         # Loop through the file to find the diff chromo's, their lengths and check if the exonic-info seq's match in length
         while True:
@@ -1375,10 +1382,6 @@ def fastReadGenome(fileName,
                                 XexonicChromo = exonicInfoFile.next()
                             
                             exonicInfoList.append([currChromo, len(XexonicChromo)])                            
-                        else: #if no exon-info file was provided, we use 0:
-                            print("OBS: no file containing exonic info was provided, so exonic status is set to 0 throughout!")
-                            for i in range(lenXall, endAtPosition +1):
-                                XexonicChromo += str(0)
                 else:
                     thisLength = len(v)
                     lenChr += thisLength
@@ -1411,39 +1414,19 @@ def fastReadGenome(fileName,
             input("Warning: lengths of exonic info and dna-seq differ!")
         
         #not all letters are ACGT!:
+        zeroSet = {'A', 'T', 'C', 'G'}
+        oneSet  = {'a', 't', 'c', 'g'}
         for i in range(lenXall):
-            if Xall[i] == 'A':
-                X += 'A'
-                Xrepeat.append(0)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'T':
-                X += 'T'
-                Xrepeat.append(0)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'C':
-                X += 'C'
-                Xrepeat.append(0)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'G':
-                X += 'G'
-                Xrepeat.append(0)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'a':
-                X += 'A'
-                Xrepeat.append(1)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 't':
-                X += 'T'
-                Xrepeat.append(1)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'c':
-                X += 'C'
-                Xrepeat.append(1)
-                Xexonic.append(XexonicAll[i])
-            elif Xall[i] == 'g':
-                X += 'G'
-                Xrepeat.append(1)
-                Xexonic.append(XexonicAll[i])
+            if i % 100000000 == 0:
+                print("ACGTacgt checked {} tokens".format(i))
+            if Xall[i] in zeroSet:
+              X += Xall[i]
+              Xrepeat.append(0)
+              Xexonic.append(XexonicAll[i])
+            elif Xall[i] in oneSet:
+              X += Xall[i].upper()
+              Xrepeat.append(1)
+              Xexonic.append(XexonicAll[i])
             else:
                 # It isn't an IndexError so we shouldn't call one
                 if VERBOSE:

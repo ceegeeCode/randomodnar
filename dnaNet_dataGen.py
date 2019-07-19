@@ -1413,24 +1413,42 @@ def fastReadGenome(fileName,
         if lenXall != len(XexonicAll):
             input("Warning: lengths of exonic info and dna-seq differ!")
         
-        #not all letters are ACGT!:
-        zeroSet = {'A', 'T', 'C', 'G'}
-        oneSet  = {'a', 't', 'c', 'g'}
-        for i in range(lenXall):
-            if i % 100000000 == 0:
-                print("ACGTacgt checked {} tokens".format(i))
-            if Xall[i] in zeroSet:
-              X += Xall[i]
-              Xrepeat.append(0)
-              Xexonic.append(XexonicAll[i])
-            elif Xall[i] in oneSet:
-              X += Xall[i].upper()
-              Xrepeat.append(1)
-              Xexonic.append(XexonicAll[i])
-            else:
-                # It isn't an IndexError so we shouldn't call one
-                if VERBOSE:
-                	print("Letter %s not ACGTacgt at: %d" % (Xall[i],i))
+
+        if exonicInfoBinaryFileName == '':
+            ''' 
+            Takes   0.6941s trainDataInterval = [0,   10000000]
+            Takes 208s      trainDataInterval = [0, 3000000000] 
+            '''
+            X = Xall.replace("N","")  # Remove the 'N' bases
+            Xrepeat = [base.islower() for base in X]  # 1 iff a/t/c/g else 0
+            X = X.upper()  # uppercase everything in X
+            Xexonic = str(0) * len(X)  # despicable hack but super fast
+        else:
+            ''' 
+            Takes 4.965s trainDataInterval = [0,   10000000]
+            Takes ?????s trainDataInterval = [0, 3000000000]
+            '''
+            #  not all letters are ACGT!:
+            zeroSet = {'A', 'T', 'C', 'G'}
+            oneSet  = {'a', 't', 'c', 'g'}
+
+            # Find the locations of all the 'N's that we will remove
+            # -- used to grab the correct parts of XexonicAll
+            for i in range(lenXall):
+                if i % 100000000 == 0:
+                    print("ACGTacgt checked {} tokens".format(i))
+                if Xall[i] in zeroSet:
+                    X += Xall[i]
+                    Xrepeat.append(0)
+                    Xexonic.append(XexonicAll[i])
+                elif Xall[i] in oneSet:
+                    X += Xall[i].upper()
+                    Xrepeat.append(1)
+                    Xexonic.append(XexonicAll[i])
+                else:
+                    # It isn't an IndexError so we shouldn't call one
+                    if VERBOSE:
+                    	print("Letter %s not ACGTacgt at: %d" % (Xall[i],i))
 
         #If desired the letters will be "one-hot" encoded:
         lenX = len(X)
@@ -1825,7 +1843,11 @@ def encodeGenome(fileName,
         #If desired the letters will be "one-hot" encoded:
         lenX = len(X)
         print("Length genome sequence, only ACGT's:%d" % lenX)
-        
+
+        if outputGenomeString_b == 1:
+            return X, Xrepeat, None, X
+        else:
+            return _, _, _
         if outputEncoded_b == 1:
             
             if outputEncodedOneHot_b == 1:
@@ -1891,7 +1913,6 @@ def encodeGenome(fileName,
                     
                 else:
                     return Xenc, XencRepeat, XencExonic
-        
         
         else:# outputEncoded_b == 0:
     
@@ -3064,7 +3085,8 @@ def genSamplesForDynamicSampling_I(nrSamples,
                      inner_b = 1, 
                      shuffleLength = 5, 
                      getFrq_b = 0,
-                     augmentWithRevComplementary_b = 1
+                     augmentWithRevComplementary_b = 1,
+                     lGenome = -1
                      ):
     '''Generate a set of nrSamples samples. This can be done either from an existing genome 
     (set fromGenome_b = 1 and supply a file name genomeFileName) or, with fromGenome_b = 0, by 
@@ -3082,8 +3104,6 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
 
 '''
-    
-    lGenome = genomeArray.shape[0] #length of genome sequnce
     if nrSamples > lGenome:
         nrSamples = lGenome - 2*flankSize
         print("Nr of samples reduced to %d which equals the length of the interval from length of genome sequence less twice the flank size")
@@ -3096,7 +3116,6 @@ def genSamplesForDynamicSampling_I(nrSamples,
     else:
         
         flankSizeOut = flankSize
-        
         
     #Set a labels-shape depending on the labelsCodetype:
     if labelsCodetype == 0:
@@ -3111,7 +3130,6 @@ def genSamplesForDynamicSampling_I(nrSamples,
         
         labelShape = 3
         
-
     if transformStyle_b == 0:
         
         if outputEncodedOneHot_b == 1:
@@ -3149,7 +3167,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
     #set a random seed bewteen 0 and 1e6:
 #    np.random.seed(seed = np.random.randint(0,1e6))
-    
+
     #NOT IN WORING ORDER!!
     if fromGenome_b == 0:
         
@@ -3224,11 +3242,22 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
             
             if labelsCodetype == 0:
-                Y[i] = genomeArray[idx]
+                if outputEncodedOneHot_b:
+                    Y[i] = oneHotLetter(genomeArray[idx])
+                else:
+                    Y[i] = intLetter(genomeArray[idx])
             elif labelsCodetype == 1:
-                Y[i] = basePair(genomeArray[idx])
+                if outputEncodedOneHot_b:
+                    Y[i] = basePair(oneHotLetter(genomeArray[idx]))
+                else:
+                    Y[i] = basePair(intLetter(genomeArray[idx]))
             elif labelsCodetype == -1:
-                Y[i] = basePairType(genomeArray[idx])
+                if outputEncodedOneHot_b:
+                    Y[i] = basePairType(oneHotLetter(genomeArray[idx]))
+                else:
+                    Y[i] = basePairType(intLetter(genomeArray[idx]))
+            # WARNING!!!
+            # TODO: These cases are not currently handled
             elif labelsCodetype == 2:
                 if exonicArray[idx] == 1:
                     Y[i] = exonicInd
@@ -3247,8 +3276,8 @@ def genSamplesForDynamicSampling_I(nrSamples,
             
             #... and fetch the correspondning flanks:
             if inclFrqModel_b == 0:
-                X[i][:flankSize] = genomeArray[(idx - flankSize):idx] #left-hand flank
-                X[i][flankSize:] = genomeArray[(idx+1):(idx + 1 + flankSize)] #right-hand flank
+                X[i][:flankSize] = [intLetter(x) for x in genomeArray[(idx - flankSize):idx]] #left-hand flank
+                X[i][flankSize:] = [intLetter(x) for x in genomeArray[(idx+1):(idx + 1 + flankSize)]] #right-hand flank
             
             if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
                 

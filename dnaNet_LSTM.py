@@ -175,70 +175,39 @@ dnaNet.allInOneWithDynSampling_ConvLSTMmodel(labelsCodetype = labelsCodetype, co
 
 '''
 
-
-
-#THEANO_FLAGS='floatX=float32,device=cuda' 
-#TENSORFLOW_FLAGS='floatX=float32,device=cuda' 
-
-import os
+import os, sys
+#  The GPU id to use, usually either "0" or "1";
+#os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
+#os.environ["CUDA_VISIBLE_DEVICES"]="2";
 import argparse
+from random import shuffle
+import pickle
 
-#set this manually at very beginning of python session (dont set anything when using Hecaton; weill get you the GTX 1080, which has high enough compute capability)
-#os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
-#to prevent the process from taking up all the ram on the gpu upon start:
-#import tensorflow as tf
 import tensorflow as tf
-
 config = tf.ConfigProto(device_count = {'GPU': 1})
 config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
 config.log_device_placement = True  # to log device placement (on which device the operation ran)
-
-#tf.device('/gpu:1')
-
 sess = tf.Session(config=config)
 tf.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
-
-
-
 from keras import utils, backend
-
 from keras.models import Sequential, Model
-
-#Conv1D
 from keras.layers import Conv1D, Conv2D, Input, Dense, Dropout, AveragePooling1D, GlobalAveragePooling1D, MaxPooling1D, AveragePooling2D, MaxPooling2D, Flatten, Concatenate, Reshape, merge, GlobalMaxPooling1D
-#Additional for LSTM
 from keras.layers import LSTM, Activation, Bidirectional, concatenate, Lambda, multiply, Add, RepeatVector, Permute, Dot, Embedding, Reshape
-
 from keras.optimizers import SGD, RMSprop, Adam
 from keras.models import model_from_json
-
 from keras.utils.vis_utils import plot_model
-
 from keras.utils import to_categorical
 
 from scipy.fftpack import fft, ifft
 
 import numpy as np
-import sys
-
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from random import shuffle
-
 #import frqModels as frqM
-
-import pickle
-
-#import graphviz
-#import pydot
-
-
-
 from dnaNet_dataGen import * #all smpling aso is here
 
 
@@ -300,7 +269,6 @@ def makeLSTMmodel(sequenceLength, nrLayers = 1, letterShape = 4, outputSize = 4,
         
     if poolLSTM == None:
         # Use only the final LSTM hidden state
-        # Skip-connection of the original word embeddings
         if shareLSTMs:
             lstm = LSTM(LSTMUnits, return_sequences=False, stateful=stateful)
             left = lstm(left)
@@ -315,7 +283,6 @@ def makeLSTMmodel(sequenceLength, nrLayers = 1, letterShape = 4, outputSize = 4,
     else:    
         # Pool the LSTM hidden states
         if shareLSTMs:
-            # Skip-connection of the original word embeddings
             lstm = LSTM(LSTMUnits, return_sequences=True, stateful=stateful)
             left  = lstm(left)  
             right = lstm(right)
@@ -487,7 +454,6 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
     print("... Model's build.")
     
     return model
-
 
 
 #to define layer in makeConv1DLSTMmodelFusedWithEROmodel, which consists in 
@@ -721,746 +687,6 @@ def makeConv1DLSTMmodelFusedWithEROmodel(eroModel, sequenceLength, letterShape, 
     print("... Model's build.")
     
     return model
-
-
-
-
-
-def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
-                                          firstIterNr = 0,
-                                          nrOfRepeats = 1,
-                                          firstRepeatNr = 0,
-                                          loss = "categorical_crossentropy", 
-                                          usedThisModel = 'makeConv1DLSTMmodel', #set this manually if restarting
-                                          onHecaton_b = 0,
-                                          convLayers_b = 1,
-                                          onlyConv_b = 0,
-                                          leftRight_b = 1,
-                                          fusedWitEROmodel_b = 0,
-                                          eroModelFileName = '',
-                                          nrLSTMlayers = 2, 
-                                          nrOfParallelLSTMstacks = 1,
-                                          finalDenseLayers_b = 0, #if 1 set the hiddenUnits param
-                       learningRate = 0.01,
-                       momentum = 0.0, 
-            trainDataIntervalStepSize = 100000, 
-            trainDataInterval0 = [0,200000] ,
-            testDataIntervalIdTotrainDataInterval_b = 0,
-            nrTestSamples = 20000,
-            testDataInterval = [400000, 600000],  #not used
-            customFlankSize_b = 1,                       
-            customFlankSize = 50,
-            overlap = 0, 
-            genSamples_b = 1, 
-            genomeFileName = '',
-            exonicInfoBinaryFileName  = '',
-            outputEncodedOneHot_b = 1,
-            labelsCodetype = 0,
-            outputEncodedInt_b = 0,
-            onlyOneRandomChromo_b = 0,
-            avoidChromo = [],
-#            genSamplesFromRandomGenome_b = 0, #KEEP THIS
-            randomGenomeSize = 4500000, 
-            randomGenomeFileName = 'rndGenome.txt',
-            getOnlyRepeats_b = 0,
-            augmentWithRevComplementary_b = 0, 
-            augmentTestDataWithRevComplementary_b = 0, 
-            inclFrqModel_b = 0,
-            insertFrqModel_b = 0,
-            frqModelFileName = '',
-            flankSizeFrqModel = 4,
-            exclFrqModelFlanks_b = 0,
-            optimizer = 'ADAM',
-            batchSize = 128, 
-            nrEpochs = 100,
-            stepsPerEpoch = 5, 
-            sizeOutput=4,
-            letterShape = 4, # size of the word            
-            lengthWindows = [3, 6],
-            hiddenUnits= [50], #for conv1d and conv2d only the first entry is used 
-            dropout_b = 0,
-            dropoutVal= 0.25,
-            dropoutLastLayer_b = 0,
-            nrFilters = [200, 100],
-            filterStride = 1,
-            padding = 'same', 
-            tryAveraging_b = 0,
-            pool_b = 0,
-            maxPooling_b = 0,
-            poolAt = [],
-            poolStrides = 1,            
-            shuffle_b = 0, 
-            inner_b = 1, 
-            shuffleLength = 5,
-            save_model_b = 1, 
-            modelName = 'ownSamples/CElegans/model3', 
-            modelDescription = 'LSTM type ... to be filled in!',
-            on_binf_b = 1, 
-            testOnly_b = 0,
-            path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj",
-            embedUnits = 64,
-            LSTMUnits = 128,
-            skipConnectEmbeddings = False,
-            shareLSTMs = False,
-            poolLSTM = None,
-            dropout_emb = 0.,
-            dropout_lstm = 0.,
-            dropout_output = 0.):
-                
-    if on_binf_b == 1:
-        root = path + r"/Inputs/"
-        rootDevelopment = path + r"/development/"
-        rootOutput = path + r"/results_nets/"
-    else:
-        path = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/"
-        root = path + r"/Inputs/"
-        rootDevelopment = path + r"/development/"
-        rootOutput = path + r"/results_nets/"
-    
-    '''
-        labelsCodetype: determines whether to encode the labels as bases (0 and default), base pairs (1) 
-                or base pair type (purine/pyrimidine, -1); the prediction obtained will be of the
-                chosen code type (ie if 1 is used it is only the base pair at the given position which
-                is predicted). Pt only works with one-hot encoding and not including the frq model 
-                (inclFrqModel_b = 0).                
-    '''
-                
-    #repeat a training/testing round the set nr of times; after first round the model (from the previous round) is reloaded
-#    lTrainDataInterval = trainDataInterval[1] - trainDataInterval[0]
-#    lTestDataInterval = testDataInterval[1] - testDataInterval[0]
-    historyTotal = {} #for recording training performance (acc/loss) across all iterations/repeats
-    historyTotal['acc'] = []
-    historyTotal['loss'] = []  
-    testHistoryTotal = {} #for recording testing performance (acc/loss) across all iterations/repeats
-    testHistoryTotal['acc'] = []
-    testHistoryTotal['loss'] = []      
-    for n in range(firstIterNr, nrOuterLoops):
-        
-        print("Now at outer iteration: ", n)
-        
-        modelFileName = rootOutput + modelName + '_bigLoopIter' + str(n)
-        
-        trainDataInterval =  [trainDataInterval0[0] + n*trainDataIntervalStepSize, trainDataInterval0[1] + n*trainDataIntervalStepSize]
-        if testDataIntervalIdTotrainDataInterval_b == 1:
-            
-            testDataInterval = trainDataInterval
-        
-        else:
-        
-            testDataInterval = [trainDataInterval[1], trainDataInterval[1] + nrTestSamples]
-
-            
-        print("trainDataInterval ", trainDataInterval)
-        print("testDataInterval ", testDataInterval)
-        
-        
-        if genSamples_b > 0.5: #generate a set of random samples from genome or random data acc to the input/the sizes set
-    
-            #if a genomeFileName is specified, use that genome:
-            if len(genomeFileName) > 0:
-                
-                fromGenome_b = 1
-                
-                startAtPosition = trainDataInterval[0]
-                endAtPosition = trainDataInterval[1]
-                
-                #read in the genome sequence:
-                if onlyOneRandomChromo_b == 0: #the whole genome seq will be read in (chromo's concatenated, if any)
-                    genomeArray, repeatArray, exonicArray, genomeString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName , startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 0)
-                    lGenome = len(genomeArray)
-                    genomeSeqSourceTrain = 'Read data from whole genome (chromo\'s concatenated, if any)'
-                elif onlyOneRandomChromo_b == 1: #only the genome seq for one randomly chosen chromo (not in avoidChromo's list) will be read in:
-                    genomeDictArray, repeatInfoDictArray, exonicInfoDictArray, genomeDictString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName ,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 1)
-                    if len(genomeDictArray.keys()) > 1:
-                        print("Warning: more than one chromosome has been selected")
-                    chromo = genomeDictArray.keys()[0]
-                    genomeArray = genomeDictArray[chromo]
-                    repeatArray = repeatInfoDictArray[chromo]
-                    exonicArray = exonicInfoDictArray[chromo]
-                    genomeString = genomeDictString[chromo]
-                    lGenome = len(genomeArray)
-                    genomeSeqSourceTrain = chromo
-                    
-                print("lGenome: %d" % lGenome)
-                
-            else:
-                print("This code pt only runs with supplied genome data; so provide a genomeFileName")
-    
-    
-            batch_size = batchSize
-            #print batch_size, nrEpoch
-                    
-            if inclFrqModel_b == 1:
-                        
-                if insertFrqModel_b != 1:
-                
-                    #We need to split the data in the part input to the conv layer and 
-                    #the part which is the output of frq model; the same is done for the
-                    #test data (below):
-                    sizeInputConv = 2*(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel)
-                    
-                    Xconv = np.zeros(shape = (batchSize, sizeInputConv, letterShape))
-                    Xfrq = np.zeros(shape = (batchSize, 1, letterShape))
-                
-                else: 
-                    
-                    sizeInput = 2*customFlankSize + 1 
-                                                        
-            else:  
-            
-                sizeInput = 2*customFlankSize 
-
-                #If augmentWithRevComplementary_b = 0, batchSize = Xconv.shape[0]; if = 1 we get back twice batchSize:
-                if augmentWithRevComplementary_b == 0:
-                    Xleft = np.zeros(shape = (batchSize, customFlankSize + overlap, letterShape))
-                    Xright = np.zeros(shape = (batchSize, customFlankSize + overlap, letterShape))
-                else:
-                    Xleft = np.zeros(shape = (2*batchSize, customFlankSize + overlap, letterShape))
-                    Xright = np.zeros(shape = (2*batchSize, customFlankSize + overlap, letterShape))
-    
-            print("sizeInput is set to: ", sizeInput)
-            
-            
-            
-            #we fetch the output from the frq model if we want to include it in the training and testing; 
-            #the test set shall also include the frq model output if so; the data for testing is loaded after
-            #the training is done (below) so as to avoid spending the memory needed for the test data during 
-            #the training part: 
-            frqModelDict = {}
-            if inclFrqModel_b == 1:
-                
-                frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel)
-                                         
-                                
-                
-    
-#            #we fetch the output from the frq model if we want to include it in the training and testing; 
-#            #the test set shall also includes the frq model output if so: 
-#            frqModelDict = {}
-#            if inclFrqModel_b == 1:
-#                
-#                frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel)
-#    
-#                #Read in the test data we avoid the chromos used for training:    
-#                avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-#                Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
-#                                                        flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
-#    
-#                if insertFrqModel_b != 1:
-#                    
-#                    #Split the test data as the training data:
-#                    nrOfTestSamples = Xt.shape[0]
-#                    Xconv_t = np.zeros(shape = (nrOfTestSamples, sizeInputConv, letterShape))
-#                    Xfrq_t = np.zeros(shape = (nrOfTestSamples, 1, letterShape))
-#        
-#                    Xconv_t[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = Xt[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
-#                    Xconv_t[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = Xt[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
-#                    Xfrq_t[:, 0, :] = Xt[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
-#        
-#        #            XsplitList_t = []            
-#        #            for i in range(nrOfTestSamples):
-#        #                
-#        #                XsplitList_t.append([Xfrq_t[i], Xconv_t[i]])
-#        #            
-#        #            Xsplit_t = np.asarray(XsplitList_t)
-#                        
-#                        
-#        #            print Xconv_t.shape, Xfrq_t.shape            
-#                
-#            else:
-#    
-#                #Read in the test data we avoid the chromos used for training:    
-#                avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-#                Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
-#    
-#                #If augmentWithRevComplementary_b = 0, nrTestSamples = Xt.shape[0]; if = 1 we get back twice nrTestSamples, but still Xt.shape[0]:
-#                Xt_left = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
-#                Xt_right = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
-#    
-#    
-#                print "Xt shape", Xt.shape
-#                print "Xt_left shape, Xt_right shape", Xt_left.shape, Xt_right.shape
-#    
-#    
-##                Xt_left[:, :(customFlankSize + overlap), :] = Xt[:, :(customFlankSize + overlap), :]
-#                Xt_left = Xt[:, :(customFlankSize + overlap), :].copy()
-#                Xt_right = Xt[:, (customFlankSize - overlap):, :].copy()
-#                #and reverse it:
-#                Xt_right = np.flip(Xt_right, axis = 1)
-#                    
-                         
-            def myIntGenerator(customFlankSize, batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype):
-               
-                while 1:
-                    X,Y = genSamplesForDynamicSampling_I(nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
-                                     genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
-                    if inclFrqModel_b == 1  and insertFrqModel_b != 1:
-            
-                        Xconv[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = X[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
-                        Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
-                        Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
-                        
-                        yield([Xfrq, Xconv],Y)
-                        
-                    
-                    elif onlyConv_b == 1 and leftRight_b == 0:
-                        
-                        yield(X,Y)
-                    
-                    else:
-                        
-                        Xleft = X[:, :(customFlankSize + overlap)].copy()
-                        Xright = X[:, (customFlankSize - overlap):].copy()
-                        #and reverse it:
-                        Xright = np.flip(Xright, axis = 1)
-
-                        yield([Xleft, Xright], to_categorical(Y))
-            
-            #Dynamically fetch small sample batches; this runs in an infinite loop
-            #in parallel to the fit_generator call below (and stops when that is done)
-            def myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype):
-               
-                while 1:
-                    X,Y = genSamplesForDynamicSampling_I(nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
-                                     genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
-    #                sizeInput = X.shape[1]
-                    if inclFrqModel_b == 1  and insertFrqModel_b != 1:
-            
-                        Xconv[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = X[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
-                        Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
-                        Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
-                        
-                        yield([Xfrq, Xconv],Y)
-                        
-                    
-                    elif onlyConv_b == 1 and leftRight_b == 0:
-                        
-                        yield(X,Y)
-                    
-                    else:
-                        
-#                        Xleft[:, :(customFlankSize+overlap), :] = X[:, :(customFlankSize + overlap) , :]
-
-                        Xleft = X[:, :(customFlankSize + overlap) , :].copy()
-                        Xright = X[:, (customFlankSize - overlap):, :].copy()
-                        #and reverse it:
-                        Xright = np.flip(Xright, axis = 1)
-    
-                        yield([Xleft, Xright], Y)
-                        
-#                        print "X left shape", Xleft.shape
-#                        print "X right shape", Xright.shape
-
-                    
-        #when if augmentWithRevComplementary_b == 1 the generated batches contain 2*batchSize samples:
-        if augmentWithRevComplementary_b == 0:
-
-            batchSizeReal = batchSize
-
-        else:
-
-            batchSizeReal = 2*batchSize
-    
-
-        #output size depends on what we want to predict (base or base pair or pyri/puri)
-        if labelsCodetype == 0:
-            sizeOutput = 4
-        elif labelsCodetype == 1 or labelsCodetype == -1 or labelsCodetype == 3:
-            sizeOutput = 2
-        elif labelsCodetype == 2:
-            sizeOutput = 3
-    
-    
-        if testOnly_b == 0: #just means that we're running a regular trianing/testing session
-    
-            #Write run-data to txt-file for documentation of the run:
-            runDataFileName = modelFileName + '_runData.txt'
-            runDataFile = open(runDataFileName, 'w') #Obs: this will overwrite an existing file with the same name
-            
-            s = "Parameters used in this run of the Python code for the deepDNA-project." + "\n"   
-            s += modelDescription  + "\n"  
-            s += 'ExonRepaetOther (ERO) prediction model included?: ' + str(fusedWitEROmodel_b) + "\n"  
-            s += 'eroModelFileName: ' + eroModelFileName + "\n" 
-            if save_model_b == 1:
-                s+= 'Model data obtained after training the model are recorded in: ' +  modelFileName + ' and ' + rootOutput + modelName + '.h5\n' 
-            runDataFile.write(s)
-            
-            s = '' #reset
-            runDataFile.write(s + "\n") #insert blank line
-            #Which genome data were used?:
-            if genSamples_b > 0.5:
-                s = "Samples generated with python code from real genome." + "\n"
-                s += "Genome data in file: " + genomeFileName + "\n"
-                s += "exonicInfoBinaryFileName: " + exonicInfoBinaryFileName + "\n"
-                s += "Letters are one-hot encoded" + "\n"
-                s += "Labels are encoded as type" + str(labelsCodetype) + "\n"
-                if onlyOneRandomChromo_b == 1:
-                    s += "Only read in data from one randomly chosen chromosome per task:"  + "\n"
-                    s += "Train data from chromosome: " + genomeSeqSourceTrain  + "\n"
-                    s += "Avoided data from these chromosomes: " +  str(avoidChromo)  + "\n"
-                else:
-                    s += "Read in the whole genome sequence" + "\n"
-                s += "shuffle_b = " + str(shuffle_b) + "\n"
-                s += "inner_b = " + str(inner_b) + "\n"
-                s += "shuffleLength = " + str(shuffleLength) +  "\n"
-                s += "trainDataIntervalStepSize:" + str(trainDataIntervalStepSize)  + "\n"
-                s += "trainDataInterval:" + str(trainDataInterval)  + "\n"  
-                s += "nrTestSamples:" + str(nrTestSamples)  + "\n"
-                s += "testDataInterval:" + str(testDataInterval)  + "\n" 
-             
-        
-            runDataFile.write(s)
-            
-            s = '' #reset
-            runDataFile.write(s + "\n") #insert blank line
-            #various params:    
-            s= 'loss = "categorical_crossentropy"\n' 
-            s += 'trainDataInterval: ' + str(trainDataInterval) + "\n"
-            s += 'testDataInterval: ' + str(testDataInterval) + "\n" 
-            s += 'customFlankSize_b: ' + str(customFlankSize_b) + "\n" 
-            s += 'customFlankSize: ' + str(customFlankSize) + "\n" 
-            s += 'genSamples_b: ' + str(genSamples_b) + "\n" 
-            s += 'genomeFileName: ' + genomeFileName + "\n" 
-            s += "outputEncodedOneHot_b: " + str(outputEncodedOneHot_b) + "\n" 
-            s += "outputEncodedInt_b: " + str(outputEncodedInt_b) + "\n" 
-            s += "onlyOneRandomChromo_b: " + str(onlyOneRandomChromo_b)  + "\n" 
-            s += "avoidChromo: " + str(avoidChromo)  + "\n" 
-            s += 'randomGenomeSize: ' + str(randomGenomeSize) + "\n" 
-            s += 'randomGenomeFileName: ' + randomGenomeFileName + "\n" 
-            s += 'augmentWithRevComplementary_b: ' + str(augmentWithRevComplementary_b) + "\n" 
-            s += 'learningRate: ' + str(learningRate) + "\n"
-            s += 'batchSize: ' + str(batchSize) + "\n"
-            s += 'dropout_b: ' + str(dropout_b) + "\n"
-            s += 'dropoutVal: ' + str(dropoutVal) + "\n"
-            s += 'tryAveraging_b: ' + str(tryAveraging_b) + "\n"
-            s += 'pool_b: ' +  str(pool_b) + "\n"
-            s += 'maxPooling_b: ' +  str(maxPooling_b) + "\n"
-            s += 'poolAt: ' +  str(poolAt) + "\n"
-            s += 'nrEpochs: ' + str(nrEpochs) + "\n" 
-            s += 'sizeOutput: ' + str(sizeOutput) + "\n" 
-            s += 'letterShape: ' + str(letterShape) + "\n" 
-            s += 'save_model_b: ' + str(save_model_b) + "\n" 
-            s += 'modelName: ' + modelName + "\n" 
-            s += 'on_binf_b: ' + str(on_binf_b) + "\n" 
-            
-            runDataFile.write(s)
-                
-            #Params for net:
-            s = '' #reset
-            runDataFile.write(s + "\n") #insert blank line
-            s = 'convLayers_b: ' + str(convLayers_b) + "\n"
-            s += 'lengthWindows: ' + str(lengthWindows)  + "\n" 
-            s += 'hiddenUnits: ' + str(hiddenUnits)  + "\n" 
-            s += 'nrFilters: ' + str(nrFilters)  + "\n" 
-            s += 'filterStride: ' + str(filterStride)  + "\n" 
-            s += 'nrLSTMlayers: ' + str(nrLSTMlayers)  + "\n" 
-            s += 'nrOfParallelLSTMstacks: ' + str(nrOfParallelLSTMstacks)
-        
-            runDataFile.write(s)
-            
-            s = '' #reset
-            runDataFile.write(s + "\n") #insert blank line
-        
-            runDataFile.close()
-            #Write run-data to txt-file for documentation of the run: DONE
-
-
-        #Run series of repeated training-and-testing sessions each consisting in nrEpochs rounds:
-        for k in range(firstRepeatNr, nrOfRepeats):       
-                    
-    
-            #in first outer-iteration build the model; thereafter reload the latest stored version (saved below)
-            if n == 0 and k == 0: 
-        
-                if convLayers_b == 0 and fusedWitEROmodel_b == 0:
-                    if not dropout_b:
-                        dropoutVal = 0.
-                    net = makeLSTMmodel(sequenceLength = customFlankSize + overlap, nrLayers = nrLSTMlayers, letterShape = letterShape,  outputSize = sizeOutput, batchSize = batchSizeReal, hiddenUnits = hiddenUnits, embedUnits = embedUnits, LSTMUnits = LSTMUnits, dropout_emb = dropout_emb, dropout_lstm = dropout_lstm, dropout_output = dropout_output, poolLSTM = poolLSTM)
-                    
-                    usedThisModel = 'makeLSTMmodel'
-                    
-                elif convLayers_b > 0 and fusedWitEROmodel_b == 0:
-                    
-                    if onlyConv_b != 1 or (onlyConv_b == 1 and leftRight_b == 1):
-                    
-                        net = makeConv1DLSTMmodel(sequenceLength = customFlankSize + overlap, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, onlyConv_b = onlyConv_b, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = sizeOutput,  batchSize = batchSizeReal, tryAveraging_b = tryAveraging_b, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
-                
-                        usedThisModel = 'makeConv1DLSTMmodel'
-                    
-                    elif onlyConv_b == 1 and leftRight_b != 1:
-                    
-                        net = makeConv1Dmodel(sequenceLength = sizeInput, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, hiddenUnits = hiddenUnits, outputSize = sizeOutput, padding = padding, pool_b = pool_b, poolStrides = poolStrides, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutVal = dropoutVal, dropoutLastLayer_b = dropoutLastLayer_b)
-        
-                        usedThisModel = 'makeConv1Dmodel'
-                    
-                elif fusedWitEROmodel_b == 1:
-                    
-                    eroModel = model_from_json(open(eroModelFileName).read())
-                    eroModel.load_weights(eroModelFileName +'.h5')
-                    
-                    net = makeConv1DLSTMmodelFusedWithEROmodel(eroModel = eroModel, sequenceLength = customFlankSize + overlap, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = sizeOutput,  batchSize = batchSizeReal, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
-                    
-                    usedThisModel = 'makeConv1DLSTMmodelFusedWithEROmodel'
-                    
-                    
-                #Call a summary of the model:
-                net.summary()
-                #Save a plot of the model:
-                if onHecaton_b == 0:
-                    plot_model(net, to_file= rootOutput + modelName + '_plot.png', show_shapes=True, show_layer_names=True)
-                
-                    
-            else:
-    
-                #reload the model from previous iter/repeat
-                if k == 0:
-                    modelFileNamePrevious = rootOutput + modelName + '_bigLoopIter' + str(n-1) + '_repeatNr' + str(nrOfRepeats-1)
-                else:
-                    modelFileNamePrevious = rootOutput + modelName + '_bigLoopIter' + str(n) + '_repeatNr' + str(k-1)
-                    
-                net = model_from_json(open(modelFileNamePrevious).read())
-                net.load_weights(modelFileNamePrevious +'.h5')
-        
-                print("I've now reloaded the model from the previous iteration: ", modelFileNamePrevious)
-                        
-
-        
-            print("Next: compile it .."     )
-        
-        
-            if optimizer == 'SGD':
-                
-                optUsed = SGD(lr= learningRate, decay=1e-6, momentum= momentum, nesterov=True)
-                #sgd = SGD(lr=0.01)
-        
-            elif optimizer =='ADAM':
-            
-                optUsed = Adam(lr= learningRate)
-            
-            elif optimizer == 'RMSprop':
-            
-                optUsed = RMSprop(lr=learningRate, decay = 1e-3)
-        
-                
-            net.compile(loss=loss, optimizer=optUsed, metrics=['accuracy'])    
-        
-            print("Compiled model ..."    )
-        
-            if testOnly_b == 0:#just means that we're running a regular trianing/testing session
-
-                if convLayers_b == 1:
-                    history = net.fit_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps_per_epoch= stepsPerEpoch, epochs=nrEpochs, verbose=1, callbacks=None, validation_data=None, validation_steps=None, class_weight=None, max_queue_size=2, workers=1, use_multiprocessing=False,  initial_epoch=1)
-                else:
-                    # Use a different generator if we are using an LSTM with an Embedding layer
-                    history = net.fit_generator(myIntGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps_per_epoch= stepsPerEpoch, epochs=nrEpochs, verbose=1, callbacks=None, validation_data=None, validation_steps=None, class_weight=None, max_queue_size=2, workers=1, use_multiprocessing=False,  initial_epoch=0)
-           
-    
-                if save_model_b == 1:
-                     
-                    json_string = net.to_json()
-                    open(modelFileName + '_repeatNr' + str(k), 'w').write(json_string)
-                    net.save_weights(modelFileName + '_repeatNr' + str(k) + '.h5',overwrite=True)
-    
-            
-                # list all data in history
-                print(history.history.keys())
-                
-                #dump the info:
-                dumpFile = modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_epoch.p'
-                pickle.dump( history.history['acc'], open(dumpFile, "wb") )
-                dumpFile = modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_epoch.p'
-                pickle.dump( history.history['loss'], open(dumpFile, "wb") )
-                
-                
-                # summarize history for accuracy
-                plt.figure()
-                plt.plot(history.history['acc'])
-                plt.title('model accuracy')
-                plt.ylabel('accuracy')
-                plt.xlabel('epoch')
-                plt.legend(['train'], loc='upper left')
-                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_epoch' + '.pdf')
-            #    plt.show()
-                plt.close()
-                # summarize history for loss
-                plt.figure()
-                plt.plot(history.history['loss'])
-                plt.title('model loss')
-                plt.ylabel('loss')
-                plt.xlabel('epoch')
-                plt.legend(['train'], loc='upper left')
-                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_epoch' + '.pdf')
-            #    plt.show()
-                plt.close()
-    
-    
-                #record and plot the total performance, ie up to this iter/repeat:
-                historyTotal['acc'].extend(history.history['acc'])
-                historyTotal['loss'].extend(history.history['loss'])
-                #.. and plot as above:
-                 # summarize history for accuracy
-                plt.figure()
-                plt.plot(historyTotal['acc'])
-                plt.title('model accuracy')
-                plt.ylabel('accuracy')
-                plt.xlabel('epoch')
-                plt.legend(['train'], loc='upper left')
-                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_allEpochs' + '.pdf')
-            #    plt.show()
-                plt.close()
-                # summarize history for loss
-                plt.figure()
-                plt.plot(historyTotal['loss'])
-                plt.title('model loss')
-                plt.ylabel('loss')
-                plt.xlabel('epoch')
-                plt.legend(['train'], loc='upper left')
-                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_allEpochs' + '.pdf')
-            #    plt.show()
-                plt.close()
-    
-         
-    
-                        
-            #test it. First read in the test data:
-            #If so desired, we fetch the output from the frq model if we want to include it in the training and testing; 
-            #the test set shall also include the frq model output if so: 
-            if testDataIntervalIdTotrainDataInterval_b == 0:
-               
-                if inclFrqModel_b == 1:
-                        
-                    #Read in the test data we avoid the chromos used for training:    
-                    avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
-                                                            flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
-        
-                    if insertFrqModel_b != 1:
-                        
-                        #Split the test data as the training data:
-                        nrOfTestSamples = Xt.shape[0]
-                        Xconv_t = np.zeros(shape = (nrOfTestSamples, sizeInputConv, letterShape))
-                        Xfrq_t = np.zeros(shape = (nrOfTestSamples, 1, letterShape))
-            
-                        Xconv_t[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = Xt[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
-                        Xconv_t[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = Xt[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
-                        Xfrq_t[:, 0, :] = Xt[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
-            
-            #            XsplitList_t = []            
-            #            for i in range(nrOfTestSamples):
-            #                
-            #                XsplitList_t.append([Xfrq_t[i], Xconv_t[i]])
-            #            
-            #            Xsplit_t = np.asarray(XsplitList_t)
-                            
-                            
-            #            print Xconv_t.shape, Xfrq_t.shape            
-                    
-                else:
-        
-                    #Read in the test data we avoid the chromos used for training:    
-                    avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
-                                                              flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  
-                                                              onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
-        
-                    #If augmentWithRevComplementary_b = 0, nrTestSamples = Xt.shape[0]; if = 1 we get back twice nrTestSamples, but still Xt.shape[0]:
-                    Xt_left = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
-                    Xt_right = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
-        
-        
-                    print("Xt shape", Xt.shape)
-                    print("Xt_left shape, Xt_right shape", Xt_left.shape, Xt_right.shape)
-        
-        
-    #                Xt_left[:, :(customFlankSize + overlap), :] = Xt[:, :(customFlankSize + overlap), :]
-                    Xt_left = Xt[:, :(customFlankSize + overlap), :].copy()
-                    Xt_right = Xt[:, (customFlankSize - overlap):, :].copy()
-                    #and reverse it:
-                    Xt_right = np.flip(Xt_right, axis = 1)
-                           
-
-        
-        
-                if inclFrqModel_b == 1:
-                    
-                    if insertFrqModel_b == 1:
-                        
-                        score, acc = net.evaluate(Xt,Yt, batch_size=batchSizeReal, verbose=1)
-                    
-                    else:
-                        
-                        score, acc = net.evaluate([Xfrq_t, Xconv_t], Yt, batch_size=batchSizeReal, verbose=1)
-                else:
-                    
-                    score, acc = net.evaluate([Xt_left, Xt_right],Yt, batch_size=batchSizeReal, verbose=1)
-                    
-                    
-            elif testDataIntervalIdTotrainDataInterval_b == 1: #we test using the dynamic sampling
-                        
-                if convLayers_b == 1:
-                    score, acc = net.evaluate_generator(myGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
-                else:
-                    score, acc = net.evaluate_generator(myIntGenerator(customFlankSize,batchSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype), steps = np.int(float(nrTestSamples)/batchSize))
-                    
-
-                
-#            #test it:
-#            if inclFrqModel_b == 1 and insertFrqModel_b != 1:
-#                score, acc = net.evaluate([Xfrq_t, Xconv_t], Yt, batch_size=batchSizeReal, verbose=1)
-#            else:
-#        
-#                score, acc = net.evaluate([Xt_left, Xt_right],Yt, batch_size=batchSizeReal, verbose=1)
-#        
-#            print('Test score:', score)
-#            print('Test accuracy:', acc)       
-    
-        
-            print('Test score:', score)
-            print('Test accuracy:', acc)
-            
-            #record and plot the total test performance, ie up to this iter/repeat:
-            testHistoryTotal['acc'].append(acc)
-            testHistoryTotal['loss'].append(score)
-            #.. and plot as above:
-             # summarize history for accuracy
-            plt.figure()
-            plt.plot(testHistoryTotal['acc'])
-            plt.title('model accuracy')
-            plt.ylabel('accuracy')
-            plt.xlabel('epoch')
-            plt.legend(['test'], loc='upper left')
-            plt.savefig(modelFileName + '_repeatNr' + str(k) + '_testing_acc_vs_allEpochs' + '.pdf')
-        #    plt.show()
-            plt.close()
-            # summarize history for loss
-            plt.figure()
-            plt.plot(testHistoryTotal['loss'])
-            plt.title('model loss')
-            plt.ylabel('loss')
-            plt.xlabel('epoch')
-            plt.legend(['test'], loc='upper left')
-            plt.savefig(modelFileName + '_repeatNr' + str(k) + '_testing_loss_vs_allEpochs' + '.pdf')
-        #    plt.show()
-            plt.close()
-            
-
-        if testOnly_b == 0:#just means that we're running a regular trianing/testing session     
-            
-            runDataFile = open(runDataFileName, 'a') #Obs: this will overwrite an existing file with the same name
-            
-            s = " " + "\n"  
-            s += 'used this core model: ' + usedThisModel  + "\n" 
-            if onlyOneRandomChromo_b == 1:
-                s += "Only read in data from one randomly chosen chromosome per task:"  + "\n"
-                s += "Test data from chromosome: " + genomeSeqSourceTest  + "\n"
-            s += 'Performance after outer iter ' + str(n) + ' on test set, loss and accuracy resp.: ' + str(score) + ' ' + str(acc) + "\n"               
-            runDataFile.write(s)
-            
-            runDataFile.close()
-            
-   
-
-
 
 #All in one run
 def allInOneSampling_LSTMmodel(loss = "categorical_crossentropy", 
@@ -1704,18 +930,797 @@ def allInOneSampling_LSTMmodel(loss = "categorical_crossentropy",
     runDataFile.write(s)
     
     runDataFile.close()
-            
-    
-    
 
-#######################################################################################
+
+def readTheGenome(genSamples_b = 1.,
+                genomeFileName = None,
+                trainDataInterval = None,
+                onlyOneRandomChromo_b = False,
+                exonicInfoBinaryFileName = None,
+                outputGenomeString_b = True,
+                outputEncoded_b = True,
+                outputEncodedOneHot_b = False,
+                outputEncodedInt_b = False,
+                outputAsDict_b = False,
+                inclFrqModel_b = False,
+                insertFrqModel_b = False):
+    """ Read and return the genome data from disk
+    """
+
+    if genSamples_b > 0.5: #generate a set of random samples from genome or random data acc to the input/the sizes set
+        #if a genomeFileName is specified, use that genome:
+        if len(genomeFileName) > 0:
+            fromGenome_b = 1
+            startAtPosition = trainDataInterval[0]
+            endAtPosition = trainDataInterval[1]
+            
+            #read in the genome sequence:
+            if onlyOneRandomChromo_b == 0: #the whole genome seq will be read in (chromo's concatenated, if any)
+                genomeArray, repeatArray, exonicArray, genomeString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName , startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = outputGenomeString_b, outputEncoded_b = outputEncoded_b, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = outputAsDict_b)
+                lGenome = len(genomeString)
+                genomeSeqSourceTrain = 'Read data from whole genome (chromo\'s concatenated, if any)'
+            elif onlyOneRandomChromo_b == 1: #only the genome seq for one randomly chosen chromo (not in avoidChromo's list) will be read in:
+                genomeDictArray, repeatInfoDictArray, exonicInfoDictArray, genomeDictString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName ,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 1)
+
+                if len(genomeDictArray.keys()) > 1:
+                    print("Warning: more than one chromosome has been selected")
+
+                chromo = genomeDictArray.keys()[0]
+                genomeArray = genomeDictArray[chromo]
+                repeatArray = repeatInfoDictArray[chromo]
+                exonicArray = exonicInfoDictArray[chromo]
+                genomeString = genomeDictString[chromo]
+                lGenome = len(genomeArray)
+                genomeSeqSourceTrain = chromo
+                
+            print("lGenome: %d" % lGenome)
+        else:
+            print("This code pt only runs with supplied genome data; so provide a genomeFileName")
     
-########### FINE
+        #we fetch the output from the frq model if we want to include it in the training and testing; 
+        #the test set shall also include the frq model output if so; the data for testing is loaded after
+        #the training is done (below) so as to avoid spending the memory needed for the test data during 
+        #the training part: 
+        if inclFrqModel_b:
+            frqModelDict = {}
+            frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel)
+            return genomeArray, repeatArray, exonicArray, genomeString, lGenome, genomeSeqSourceTrain, frqModelDict
+        else:
+            return genomeArray, repeatArray, exonicArray, genomeString, lGenome, genomeSeqSourceTrain, None
+
+
+def myIntGenerator(batchSize = -1,
+                customFlankSize = -1,
+                inclFrqModel_b = False,
+                insertFrqModel_b = False,
+                labelsCodetype=-2,
+                genomeArray = None,
+                repeatArray = None,
+                exonicArray = None,
+                getOnlyRepeats_b = False,
+                genomeString = None,
+                frqModelDict = None,
+                flankSizeFrqModel = None,
+                exclFrqModelFlanks_b = False,
+                outputEncodedOneHot_b = False,
+                outputEncodedInt_b = False,
+                shuffle_b = False,
+                inner_b = False,
+                augmentWithRevComplementary_b = False,
+                lGenome = -1,
+                overlap = -1,
+                genRandomSamples_b = False,
+                num_classes = -1):
+    '''Used when the inputs are just a sequence of integers (LSTM)
+       TODO: Make thread-safe
+    '''
+    while 1:
+        X,Y = genSamplesForDynamicSampling_I(nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b, genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = 0, labelsCodetype = labelsCodetype, outputEncodedInt_b = 1, shuffle_b = shuffle_b , inner_b = inner_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, lGenome = lGenome, genRandomSamples_b = genRandomSamples_b)
+
+        if inclFrqModel_b == 1  and insertFrqModel_b != 1:
+            Xconv[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = X[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
+            Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
+            Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]            
+            yield([Xfrq, Xconv],Y)
+                    
+        else:
+            Xleft = X[:, :(customFlankSize + overlap)].copy()
+            Xright = X[:, (customFlankSize - overlap):].copy()
+            Xright = np.flip(Xright, axis = 1)  # and reverse it
+            yield([Xleft, Xright], to_categorical(Y, num_classes = num_classes))
+            
+
+def myOneHotGenerator(batchSize = -1,
+                customFlankSize = -1,
+                inclFrqModel_b = False,
+                insertFrqModel_b = False,
+                labelsCodetype=-2,
+                genomeArray = None,
+                repeatArray = None,
+                exonicArray = None,
+                getOnlyRepeats_b = False,
+                genomeString = None,
+                frqModelDict = None,
+                flankSizeFrqModel = None,
+                exclFrqModelFlanks_b = False,
+                outputEncodedOneHot_b = False,
+                outputEncodedInt_b = False,
+                shuffle_b = False,
+                inner_b = False,
+                shuffleLength = -1,
+                augmentWithRevComplementary_b = False,
+                lGenome = -1,
+                overlap = -1,
+                genRandomSamples_b = False,
+                num_classes = -1):
+    '''Used when the inputs are a sequence of 1-hot vectors (Conv1DLSTM)
+       TODO: Make thread-safe
+    '''
+    while 1:
+        X,Y = genSamplesForDynamicSampling_I(nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b, genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, genRandomSamples_b = genRandomSamples_b)
+
+        if inclFrqModel_b == 1  and insertFrqModel_b != 1:
+            Xconv[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = X[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
+            Xconv[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = X[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
+            Xfrq[:, 0, :] = X[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
+            yield([Xfrq, Xconv],Y)
+        
+        elif onlyConv_b == 1 and leftRight_b == 0:
+            yield(X,Y)
+        
+        else:
+            Xleft = X[:, :(customFlankSize + overlap) , :].copy()
+            Xright = X[:, (customFlankSize - overlap):, :].copy()
+            Xright = np.flip(Xright, axis = 1)  # and reverse it
+            yield([Xleft, Xright], Y)
+                        
+
+def getGenerator(batchSize = -1,
+                customFlankSize = -1,
+                inclFrqModel_b = False,
+                insertFrqModel_b = False,
+                labelsCodetype=-2,
+                genomeArray = None,
+                repeatArray = None,
+                exonicArray = None,
+                getOnlyRepeats_b = False,
+                genomeString = None,
+                frqModelDict = None,
+                flankSizeFrqModel = None,
+                exclFrqModelFlanks_b = False,
+                outputEncodedOneHot_b = False,
+                outputEncodedInt_b = False,
+                shuffle_b = False,
+                inner_b = False,
+                augmentWithRevComplementary_b = False,
+                lGenome = -1,
+                overlap = -1,
+                genRandomSamples_b = False,
+                num_classes = -1):
+    ''' Returns a data generator object that's used for training and evaluation
+    '''
+    assert outputEncodedInt_b != outputEncodedOneHot_b
+    if outputEncodedInt_b:
+        return myIntGenerator(batchSize, customFlankSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype, genomeArray, repeatArray, exonicArray, getOnlyRepeats_b, genomeString, frqModelDict, flankSizeFrqModel, exclFrqModelFlanks_b, outputEncodedOneHot_b, outputEncodedInt_b, shuffle_b, inner_b, augmentWithRevComplementary_b, lGenome, overlap, genRandomSamples_b, num_classes)
+    else:
+        return myOneHotGenerator(batchSize, customFlankSize, inclFrqModel_b, insertFrqModel_b, labelsCodetype, genomeArray, repeatArray, exonicArray, getOnlyRepeats_b, genomeString, frqModelDict, flankSizeFrqModel, exclFrqModelFlanks_b, outputEncodedOneHot_b, outputEncodedInt_b, shuffle_b, inner_b, augmentWithRevComplementary_b, lGenome, overlap, genRandomSamples_b, num_classes)
+
+
+def buildModel(convLayers_b = False,
+                fusedWitEROmodel_b = False,
+                eroModelFileName = None,
+                dropout_b = False,
+                dropoutVal = 0.,
+                onlyConv_b = False,
+                leftRight_b = False,
+                sequenceLength = -1,
+                nrOfParallelLSTMstacks = -1,
+                shareLSTMs = False,
+                letterShape = -1,
+                outputSize = -1,
+                batchSize = -1,
+                hiddenUnits = [-1],
+                embedUnits = -1,
+                LSTMUnits = -1,
+                dropout_emb = 0.,
+                dropout_lstm = 0.,
+                dropout_output = 0.,
+                lengthWindows = -1,
+                nrFilters = -1,
+                filterStride = -1,
+                finalDenseLayers_b = True,
+                tryAveraging_b = False,
+                pool_b = False,
+                maxPooling_b = False,
+                poolAt = -1,
+                dropoutConvLayers_b = False,
+                poolLSTM = None,
+                rootOutput = None,
+                modelName = None,
+                reload_model = False,
+                optimizer = None,
+                learningRate = -1,
+                momentum = False,
+                loss = None):
+    ''' Builds the model defined in the command-line arguments
+    '''
+    if convLayers_b == 0 and fusedWitEROmodel_b == 0:
+        if not dropout_b:
+            dropoutVal = 0.
+        net = makeLSTMmodel(sequenceLength = sequenceLength, nrLayers = nrOfParallelLSTMstacks, letterShape = letterShape, outputSize = outputSize, batchSize = batchSize, hiddenUnits = hiddenUnits, embedUnits = embedUnits, LSTMUnits = LSTMUnits, dropout_emb = dropout_emb, dropout_lstm = dropout_lstm, dropout_output = dropout_output, poolLSTM = poolLSTM, shareLSTMs = shareLSTMs)
+        usedThisModel = 'makeLSTMmodel'
+        
+    elif convLayers_b > 0 and fusedWitEROmodel_b == 0:
+        if onlyConv_b != 1 or (onlyConv_b == 1 and leftRight_b == 1):
+            net = makeConv1DLSTMmodel(sequenceLength = sequenceLength, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, onlyConv_b = onlyConv_b, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = outputSize,  batchSize = batchSize, tryAveraging_b = tryAveraging_b, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
+            usedThisModel = 'makeConv1DLSTMmodel'
+        
+        elif onlyConv_b == 1 and leftRight_b != 1:
+            net = makeConv1Dmodel(sequenceLength = sizeInput, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, hiddenUnits = hiddenUnits, outputSize = outputSize, padding = padding, pool_b = pool_b, poolStrides = poolStrides, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutVal = dropoutVal, dropoutLastLayer_b = dropoutLastLayer_b)
+            usedThisModel = 'makeConv1Dmodel'
+        
+    elif fusedWitEROmodel_b == 1:
+        eroModel = model_from_json(open(eroModelFileName).read())
+        eroModel.load_weights(eroModelFileName +'.h5')
+        
+        net = makeConv1DLSTMmodelFusedWithEROmodel(eroModel = eroModel, sequenceLength = sequenceLength, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = outputSize,  batchSize = batchSize, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
+        usedThisModel = 'makeConv1DLSTMmodelFusedWithEROmodel'
+        
+    net.summary()
+    plot_model(net, to_file= rootOutput + modelName + '_plot.png', show_shapes=True, show_layer_names=True)
+
+    if reload_model:
+        modelFileNamePrevious = rootOutput + modelName + '_best'
+        net = model_from_json(open(modelFileNamePrevious).read())
+        net.load_weights(modelFileNamePrevious +'.h5')
+        print("I've now reloaded the model from the previous iteration: ", modelFileNamePrevious)
+
+    print("Next: compile it .."     )
+    if optimizer == 'SGD':
+        optUsed = SGD(lr= learningRate, decay=1e-6, momentum=momentum, nesterov=True)
+    elif optimizer =='ADAM':
+        optUsed = Adam(lr= learningRate)
+    elif optimizer == 'RMSprop':
+        optUsed = RMSprop(lr=learningRate, decay = 1e-3)
+
+    net.compile(loss=loss, optimizer=optUsed, metrics=['accuracy'])    
     
-#######################################################################################
+    print("Compiled model ..."    )
+    return net, usedThisModel
+
+###
+# NOTE: This is the only training function that I've been using.
+###
+def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
+                                          firstIterNr = 0,
+                                          nrOfRepeats = 1,
+                                          firstRepeatNr = 0,
+                                          loss = "categorical_crossentropy", 
+                                          usedThisModel = 'makeConv1DLSTMmodel', #set this manually if restarting
+                                          onHecaton_b = 0,
+                                          convLayers_b = 1,
+                                          onlyConv_b = 0,
+                                          leftRight_b = 1,
+                                          fusedWitEROmodel_b = 0,
+                                          eroModelFileName = '',
+                                          nrOfParallelLSTMstacks = 1,
+                                          finalDenseLayers_b = 0, #if 1 set the hiddenUnits param
+                                          learningRate = 0.01,
+                                          momentum = 0.0, 
+                                          trainDataIntervalStepSize = 100000, 
+                                          trainDataInterval0 = [0,200000] ,
+                                          testDataIntervalIdTotrainDataInterval_b = 0,
+                                          nrTestSamples = 20000,
+                                          testDataInterval = [400000, 600000],  #not used
+                                          customFlankSize_b = 1,                       
+                                          customFlankSize = 50,
+                                          overlap = 0, 
+                                          genSamples_b = 1, 
+                                          genomeFileName = '',
+                                          exonicInfoBinaryFileName  = '',
+                                          outputEncodedOneHot_b = 1,
+                                          labelsCodetype = 0,
+                                          outputEncodedInt_b = 0,
+                                          onlyOneRandomChromo_b = 0,
+                                          avoidChromo = [],
+#                                          genSamplesFromRandomGenome_b = 0, #KEEP THIS
+                                          randomGenomeSize = 4500000, 
+                                          randomGenomeFileName = 'rndGenome.txt',
+                                          getOnlyRepeats_b = 0,
+                                          augmentWithRevComplementary_b = 0, 
+                                          augmentTestDataWithRevComplementary_b = 0, 
+                                          inclFrqModel_b = 0,
+                                          insertFrqModel_b = 0,
+                                          frqModelFileName = '',
+                                          flankSizeFrqModel = 4,
+                                          exclFrqModelFlanks_b = 0,
+                                          optimizer = 'ADAM',
+                                          batchSize = 128, 
+                                          nrEpochs = 100,
+                                          stepsPerEpoch = 5, 
+                                          sizeOutput=4,
+                                          letterShape = 4, # size of the word            
+                                          lengthWindows = [3, 6],
+                                          hiddenUnits= [50], #for conv1d and conv2d only the first entry is used 
+                                          dropout_b = 0,
+                                          dropoutVal= 0.25,
+                                          dropoutLastLayer_b = 0,
+                                          nrFilters = [200, 100],
+                                          filterStride = 1,
+                                          padding = 'same', 
+                                          tryAveraging_b = 0,
+                                          pool_b = 0,
+                                          maxPooling_b = 0,
+                                          poolAt = [],
+                                          poolStrides = 1,            
+                                          shuffle_b = 0, 
+                                          inner_b = 1, 
+                                          shuffleLength = 5,
+                                          save_model_b = 1, 
+                                          modelName = 'ownSamples/CElegans/model3', 
+                                          modelDescription = 'LSTM type ... to be filled in!',
+                                          on_binf_b = 1, 
+                                          testOnly_b = 0,
+                                          path = r"/isdata/kroghgrp/tkj375/various_python/DNA_proj",
+                                          embedUnits = 64,
+                                          LSTMUnits = 128,
+                                          skipConnectEmbeddings = False,
+                                          shareLSTMs = False,
+                                          poolLSTM = None,
+                                          dropout_emb = 0.,
+                                          dropout_lstm = 0.,
+                                          dropout_output = 0.,
+                                          outputGenomeString_b = 1,
+                                          outputAsDict_b = 0,
+                                          outputEncoded_b = 1,
+                                          reload_model = False,
+                                          genRandomSamples_b = False):
+    ''' Train a DNA sequence prediction model based on LSTMs
+    '''
+    if on_binf_b == 1:
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
+    else:
+        path = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/"
+        root = path + r"/Inputs/"
+        rootDevelopment = path + r"/development/"
+        rootOutput = path + r"/results_nets/"
+    
+    trainDataInterval = trainDataInterval0
+    if testDataIntervalIdTotrainDataInterval_b == 1:
+        testDataInterval = trainDataInterval
+    else:
+        testDataInterval = [trainDataInterval[1], trainDataInterval[1] + nrTestSamples]
+    print("trainDataInterval ", trainDataInterval)
+    print("testDataInterval ", testDataInterval)
+
+    if augmentWithRevComplementary_b == 0:
+        # the generated batches contain 2*batchSize samples:
+        batchSizeReal = batchSize
+    else:
+        batchSizeReal = 2*batchSize
+    '''
+    sizeOutput depends on what we want to predict (base or base pair or pyri/puri)
+
+    labelsCodetype: determines whether to encode the labels as bases (0 and default), base pairs (1) 
+                or base pair type (purine/pyrimidine, -1); the prediction obtained will be of the
+                chosen code type (ie if 1 is used it is only the base pair at the given position which
+                is predicted). Pt only works with one-hot encoding and not including the frq model 
+                (inclFrqModel_b = 0).                
+    '''
+    if labelsCodetype == 0:
+        sizeOutput = 4
+    elif labelsCodetype == 1 or labelsCodetype == -1 or labelsCodetype == 3:
+        sizeOutput = 2
+    elif labelsCodetype == 2:
+        sizeOutput = 3
+    '''
+    We read the genome outside the of training loop and setup the data generator
+    TODO: What is the Pythonic way to split multiple returned variables across multiple lines?
+    '''
+    genomeArray, repeatArray, exonicArray, genomeString, lGenome, genomeSeqSourceTrain, frqModelDict = readTheGenome(genSamples_b, genomeFileName, trainDataInterval, onlyOneRandomChromo_b, exonicInfoBinaryFileName, outputGenomeString_b, outputEncoded_b, outputEncodedOneHot_b, outputEncodedInt_b, outputAsDict_b, inclFrqModel_b, insertFrqModel_b)
+
+    dataGenerator = getGenerator(batchSize = batchSize,
+                                customFlankSize = customFlankSize,
+                                inclFrqModel_b = inclFrqModel_b,
+                                insertFrqModel_b = insertFrqModel_b,
+                                labelsCodetype = labelsCodetype,
+                                genomeArray = genomeArray,
+                                repeatArray = repeatArray,
+                                exonicArray = exonicArray,
+                                getOnlyRepeats_b = getOnlyRepeats_b,
+                                genomeString = genomeString,
+                                frqModelDict = frqModelDict,
+                                flankSizeFrqModel = flankSizeFrqModel,
+                                exclFrqModelFlanks_b = exclFrqModelFlanks_b,
+                                outputEncodedOneHot_b = outputEncodedOneHot_b,
+                                outputEncodedInt_b = outputEncodedInt_b,
+                                shuffle_b = shuffle_b,
+                                inner_b = inner_b,
+                                augmentWithRevComplementary_b = augmentWithRevComplementary_b,
+                                lGenome = lGenome,
+                                overlap = overlap,
+                                genRandomSamples_b = genRandomSamples_b,
+                                num_classes = sizeOutput)
+
+    evalGenerator = getGenerator(batchSize = batchSize,
+                                customFlankSize = customFlankSize,
+                                inclFrqModel_b = inclFrqModel_b,
+                                insertFrqModel_b = insertFrqModel_b,
+                                labelsCodetype = labelsCodetype,
+                                genomeArray = genomeArray,
+                                repeatArray = repeatArray,
+                                exonicArray = exonicArray,
+                                getOnlyRepeats_b = getOnlyRepeats_b,
+                                genomeString = genomeString,
+                                frqModelDict = frqModelDict,
+                                flankSizeFrqModel = flankSizeFrqModel,
+                                exclFrqModelFlanks_b = exclFrqModelFlanks_b,
+                                outputEncodedOneHot_b = outputEncodedOneHot_b,
+                                outputEncodedInt_b = outputEncodedInt_b,
+                                shuffle_b = shuffle_b,
+                                inner_b = inner_b,
+                                augmentWithRevComplementary_b = augmentWithRevComplementary_b,
+                                lGenome = lGenome,
+                                overlap = overlap,
+                                genRandomSamples_b = True,
+                                num_classes = sizeOutput)
+    '''
+    Build and compile the model outside the mainloop
+    '''
+    sequenceLength = customFlankSize + overlap
+    net, useThisModel = buildModel(convLayers_b = convLayers_b,
+                fusedWitEROmodel_b = fusedWitEROmodel_b,
+                eroModelFileName = eroModelFileName,
+                dropout_b = dropout_b,
+                dropoutVal = dropoutVal,
+                onlyConv_b = onlyConv_b,
+                leftRight_b = leftRight_b,
+                sequenceLength = sequenceLength,
+                nrOfParallelLSTMstacks = nrOfParallelLSTMstacks,
+                shareLSTMs = shareLSTMs,
+                letterShape = letterShape,
+                outputSize = sizeOutput,
+                batchSize = batchSize,
+                hiddenUnits = hiddenUnits,
+                embedUnits = embedUnits,
+                LSTMUnits = LSTMUnits,
+                dropout_emb = dropout_emb,
+                dropout_lstm = dropout_lstm,
+                dropout_output = dropout_output,
+                lengthWindows = lengthWindows,
+                nrFilters = nrFilters,
+                filterStride = filterStride,
+                finalDenseLayers_b = finalDenseLayers_b,
+                tryAveraging_b = tryAveraging_b,
+                pool_b = pool_b,
+                maxPooling_b = maxPooling_b,
+                poolAt = poolAt,
+                dropoutConvLayers_b = dropout_b,
+                poolLSTM = poolLSTM,
+                rootOutput = rootOutput,
+                modelName = modelName,
+                reload_model = reload_model,
+                optimizer = optimizer,
+                learningRate = learningRate,
+                momentum = momentum,
+                loss = loss)
+
+    '''
+    Data structures for model accounting
+    '''                
+    historyTotal = {} #for recording training performance (acc/loss) across all iterations/repeats
+    historyTotal['acc'] = []
+    historyTotal['loss'] = []  
+    testHistoryTotal = {} #for recording testing performance (acc/loss) across all iterations/repeats
+    testHistoryTotal['acc'] = []
+    testHistoryTotal['loss'] = []
+    best_acc = 0.
+
+    for n in range(firstIterNr, nrOuterLoops):
+        print("Now at outer iteration: ", n)
+        modelFileName = rootOutput + modelName + '_bigLoopIter' + str(n)
+        
+        if genSamples_b > 0.5:
+            if inclFrqModel_b == 1:
+                if insertFrqModel_b != 1:
+                    #We need to split the data in the part input to the conv layer and 
+                    #the part which is the output of frq model; the same is done for the
+                    #test data (below):
+                    sizeInputConv = 2*(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel)
+                    
+                    Xconv = np.zeros(shape = (batchSize, sizeInputConv, letterShape))
+                    Xfrq = np.zeros(shape = (batchSize, 1, letterShape))
+                else: 
+                    sizeInput = 2*customFlankSize + 1 
+                                                        
+            else:  
+                sizeInput = 2*customFlankSize 
+
+                #If augmentWithRevComplementary_b = 0, batchSize = Xconv.shape[0]; if = 1 we get back twice batchSize:
+                if augmentWithRevComplementary_b == 0:
+                    Xleft = np.zeros(shape = (batchSize, customFlankSize + overlap, letterShape))
+                    Xright = np.zeros(shape = (batchSize, customFlankSize + overlap, letterShape))
+                else:
+                    Xleft = np.zeros(shape = (2*batchSize, customFlankSize + overlap, letterShape))
+                    Xright = np.zeros(shape = (2*batchSize, customFlankSize + overlap, letterShape))
+    
+            print("sizeInput is set to: ", sizeInput)
+            
+            #we fetch the output from the frq model if we want to include it in the training and testing; 
+            #the test set shall also include the frq model output if so; the data for testing is loaded after
+            #the training is done (below) so as to avoid spending the memory needed for the test data during 
+            #the training part: 
+            #frqModelDict = {}
+            #if inclFrqModel_b == 1:
+            #    frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel)
+                
+            #Dynamically fetch small sample batches; this runs in an infinite loop
+            #in parallel to the fit_generator call below (and stops when that is done)
+
+    
+        if not testOnly_b: #just means that we're running a regular training/testing session
+
+            '''
+            TODO: abstract this into a different function
+            '''
+            #Write run-data to txt-file for documentation of the run:
+            runDataFileName = rootOutput + modelName + '_runData.txt'
+            runDataFile = open(runDataFileName, 'w') #Obs: this will overwrite an existing file with the same name
+            
+            s = "Parameters used in this run of the Python code for the deepDNA-project." + "\n"   
+            s += modelDescription  + "\n"  
+            s += 'ExonRepaetOther (ERO) prediction model included?: ' + str(fusedWitEROmodel_b) + "\n"  
+            s += 'eroModelFileName: ' + eroModelFileName + "\n" 
+            if save_model_b == 1:
+                s+= 'Model data obtained after training the model are recorded in: ' +  modelFileName + ' and ' + rootOutput + modelName + '.h5\n' 
+            runDataFile.write(s)
+            
+            s = '' #reset
+            runDataFile.write(s + "\n") #insert blank line
+            #Which genome data were used?:
+            if genSamples_b > 0.5:
+                s = "Samples generated with python code from real genome." + "\n"
+                s += "Genome data in file: " + genomeFileName + "\n"
+                s += "exonicInfoBinaryFileName: " + exonicInfoBinaryFileName + "\n"
+                s += "Letters are one-hot encoded" + "\n"
+                s += "Labels are encoded as type" + str(labelsCodetype) + "\n"
+                if onlyOneRandomChromo_b == 1:
+                    s += "Only read in data from one randomly chosen chromosome per task:"  + "\n"
+                    s += "Train data from chromosome: " + genomeSeqSourceTrain  + "\n"
+                    s += "Avoided data from these chromosomes: " +  str(avoidChromo)  + "\n"
+                else:
+                    s += "Read in the whole genome sequence" + "\n"
+                s += "shuffle_b = " + str(shuffle_b) + "\n"
+                s += "inner_b = " + str(inner_b) + "\n"
+                s += "shuffleLength = " + str(shuffleLength) +  "\n"
+                s += "trainDataIntervalStepSize:" + str(trainDataIntervalStepSize)  + "\n"
+                s += "trainDataInterval:" + str(trainDataInterval)  + "\n"  
+                s += "nrTestSamples:" + str(nrTestSamples)  + "\n"
+                s += "testDataInterval:" + str(testDataInterval)  + "\n" 
+             
+        
+            runDataFile.write(s)
+            
+            s = '' #reset
+            runDataFile.write(s + "\n") #insert blank line
+            #various params:    
+            s= 'loss = "categorical_crossentropy"\n' 
+            s += 'trainDataInterval: ' + str(trainDataInterval) + "\n"
+            s += 'testDataInterval: ' + str(testDataInterval) + "\n" 
+            s += 'customFlankSize_b: ' + str(customFlankSize_b) + "\n" 
+            s += 'customFlankSize: ' + str(customFlankSize) + "\n" 
+            s += 'genSamples_b: ' + str(genSamples_b) + "\n" 
+            s += 'genomeFileName: ' + genomeFileName + "\n" 
+            s += "outputEncodedOneHot_b: " + str(outputEncodedOneHot_b) + "\n" 
+            s += "outputEncodedInt_b: " + str(outputEncodedInt_b) + "\n" 
+            s += "onlyOneRandomChromo_b: " + str(onlyOneRandomChromo_b)  + "\n" 
+            s += "avoidChromo: " + str(avoidChromo)  + "\n" 
+            s += 'randomGenomeSize: ' + str(randomGenomeSize) + "\n" 
+            s += 'randomGenomeFileName: ' + randomGenomeFileName + "\n" 
+            s += 'augmentWithRevComplementary_b: ' + str(augmentWithRevComplementary_b) + "\n" 
+            s += 'learningRate: ' + str(learningRate) + "\n"
+            s += 'batchSize: ' + str(batchSize) + "\n"
+            s += 'dropout_b: ' + str(dropout_b) + "\n"
+            s += 'dropoutVal: ' + str(dropoutVal) + "\n"
+            s += 'tryAveraging_b: ' + str(tryAveraging_b) + "\n"
+            s += 'pool_b: ' +  str(pool_b) + "\n"
+            s += 'maxPooling_b: ' +  str(maxPooling_b) + "\n"
+            s += 'poolAt: ' +  str(poolAt) + "\n"
+            s += 'nrEpochs: ' + str(nrEpochs) + "\n" 
+            s += 'sizeOutput: ' + str(sizeOutput) + "\n" 
+            s += 'letterShape: ' + str(letterShape) + "\n" 
+            s += 'save_model_b: ' + str(save_model_b) + "\n" 
+            s += 'modelName: ' + modelName + "\n" 
+            s += 'on_binf_b: ' + str(on_binf_b) + "\n" 
+            
+            runDataFile.write(s)
+                
+            #Params for net:
+            s = '' #reset
+            runDataFile.write(s + "\n") #insert blank line
+            s = 'convLayers_b: ' + str(convLayers_b) + "\n"
+            s += 'lengthWindows: ' + str(lengthWindows)  + "\n" 
+            s += 'hiddenUnits: ' + str(hiddenUnits)  + "\n" 
+            s += 'nrFilters: ' + str(nrFilters)  + "\n" 
+            s += 'filterStride: ' + str(filterStride)  + "\n" 
+            s += 'nrOfParallelLSTMstacks: ' + str(nrOfParallelLSTMstacks)
+        
+            runDataFile.write(s)
+            
+            s = '' #reset
+            runDataFile.write(s + "\n") #insert blank line
+        
+            runDataFile.close()
+            #Write run-data to txt-file for documentation of the run: DONE
+
+        #Run series of repeated training-and-testing sessions each consisting in nrEpochs rounds:
+        for k in range(firstRepeatNr, nrOfRepeats):       
+        
+            if testOnly_b == 0:#just means that we're running a regular trianing/testing session
+                if outputEncodedInt_b:
+                    history = net.fit_generator(dataGenerator, steps_per_epoch=stepsPerEpoch, epochs=nrEpochs, verbose=True, max_queue_size=10, workers=1, use_multiprocessing=False)
+           
+                #dump the info:
+                dumpFile = modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_epoch.p'
+                pickle.dump( history.history['acc'], open(dumpFile, "wb") )
+                dumpFile = modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_epoch.p'
+                pickle.dump( history.history['loss'], open(dumpFile, "wb") )
+                
+                
+                # summarize history for accuracy
+                plt.figure()
+                plt.plot(history.history['acc'])
+                plt.title('model accuracy')
+                plt.ylabel('accuracy')
+                plt.xlabel('epoch')
+                plt.legend(['train'], loc='upper left')
+                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_epoch' + '.pdf')
+                plt.close()
+                # summarize history for loss
+                plt.figure()
+                plt.plot(history.history['loss'])
+                plt.title('model loss')
+                plt.ylabel('loss')
+                plt.xlabel('epoch')
+                plt.legend(['train'], loc='upper left')
+                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_epoch' + '.pdf')
+                plt.close()
+    
+    
+                #record and plot the total performance, ie up to this iter/repeat:
+                historyTotal['acc'].extend(history.history['acc'])
+                historyTotal['loss'].extend(history.history['loss'])
+                #.. and plot as above:
+                # summarize history for accuracy
+                plt.figure()
+                plt.plot(historyTotal['acc'])
+                plt.title('model accuracy')
+                plt.ylabel('accuracy')
+                plt.xlabel('epoch')
+                plt.legend(['train'], loc='upper left')
+                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_acc_vs_allEpochs' + '.pdf')
+                plt.close()
+                # summarize history for loss
+                plt.figure()
+                plt.plot(historyTotal['loss'])
+                plt.title('model loss')
+                plt.ylabel('loss')
+                plt.xlabel('epoch')
+                plt.legend(['train'], loc='upper left')
+                plt.savefig(modelFileName + '_repeatNr' + str(k) + '_training_loss_vs_allEpochs' + '.pdf')
+                plt.close()
+    
+                    
+            #test it. First read in the test data:
+            #If so desired, we fetch the output from the frq model if we want to include it in the training and testing; 
+            #the test set shall also include the frq model output if so: 
+            if testDataIntervalIdTotrainDataInterval_b:
+                ''' Test using dynamic data sampling'''
+                score, acc = net.evaluate_generator(evalGenerator, steps=10)#np.int(float(nrTestSamples)/batchSize))
+                if save_model_b:
+                    json_string = net.to_json()
+                    open(modelFileName + '_repeatNr' + str(k), 'w').write(json_string)
+                    net.save_weights(modelFileName + '_repeatNr' + str(k) + '.h5', overwrite=True)
+
+                    if acc > best_acc:
+                        '''
+                        Keep track of the best model
+                        '''
+                        json_string = net.to_json()
+                        open(rootOutput + modelName + '_best', 'w').write(json_string)
+                        net.save_weights(rootOutput + modelName + '_best.h5', overwrite=True)
+            else:
+                '''WARNING: None of this code is tested with the new data generators'''    
+                if inclFrqModel_b == 1:
+                    #Read in the test data we avoid the chromos used for training:    
+                    avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
+                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
+        
+                    if insertFrqModel_b != 1:
+                        #Split the test data as the training data:
+                        nrOfTestSamples = Xt.shape[0]
+                        Xconv_t = np.zeros(shape = (nrOfTestSamples, sizeInputConv, letterShape))
+                        Xfrq_t = np.zeros(shape = (nrOfTestSamples, 1, letterShape))
+            
+                        Xconv_t[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :] = Xt[:, :(customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel), :]
+                        Xconv_t[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel):, :] = Xt[:, (customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel +1):, :]
+                        Xfrq_t[:, 0, :] = Xt[:,customFlankSize - exclFrqModelFlanks_b*flankSizeFrqModel, :]
+                else:
+                    #Read in the test data we avoid the chromos used for training:    
+                    avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
+                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, exonicInfoBinaryFileName = exonicInfoBinaryFileName, flankSize = customFlankSize, getOnlyRepeats_b = getOnlyRepeats_b, inclFrqModel_b = inclFrqModel_b,
+                                                              flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
+        
+                    #If augmentWithRevComplementary_b = 0, nrTestSamples = Xt.shape[0]; if = 1 we get back twice nrTestSamples, but still Xt.shape[0]:
+                    Xt_left = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
+                    Xt_right = np.zeros(shape = (Xt.shape[0], customFlankSize + overlap, letterShape))
+        
+                    print("Xt shape", Xt.shape)
+                    print("Xt_left shape, Xt_right shape", Xt_left.shape, Xt_right.shape)
+        
+                    Xt_left = Xt[:, :(customFlankSize + overlap), :].copy()
+                    Xt_right = Xt[:, (customFlankSize - overlap):, :].copy()
+                    #and reverse it:
+                    Xt_right = np.flip(Xt_right, axis = 1)
+                           
+                if inclFrqModel_b == 1:
+                    if insertFrqModel_b == 1:
+                        score, acc = net.evaluate(Xt,Yt, batch_size=batchSizeReal, verbose=1)
+                    else:
+                        score, acc = net.evaluate([Xfrq_t, Xconv_t], Yt, batch_size=batchSizeReal, verbose=1)
+                else:
+                    score, acc = net.evaluate([Xt_left, Xt_right],Yt, batch_size=batchSizeReal, verbose=1)
+                    
+            print('Test score:', score)
+            print('Test accuracy:', acc)
+            
+            #record and plot the total test performance, ie up to this iter/repeat:
+            testHistoryTotal['acc'].append(acc)
+            testHistoryTotal['loss'].append(score)
+            #.. and plot as above:
+             # summarize history for accuracy
+            plt.figure()
+            plt.plot(testHistoryTotal['acc'])
+            plt.title('model accuracy')
+            plt.ylabel('accuracy')
+            plt.xlabel('epoch')
+            plt.legend(['test'], loc='upper left')
+            plt.savefig(modelFileName + '_repeatNr' + str(k) + '_testing_acc_vs_allEpochs' + '.pdf')
+            plt.close()
+            # summarize history for loss
+            plt.figure()
+            plt.plot(testHistoryTotal['loss'])
+            plt.title('model loss')
+            plt.ylabel('loss')
+            plt.xlabel('epoch')
+            plt.legend(['test'], loc='upper left')
+            plt.savefig(modelFileName + '_repeatNr' + str(k) + '_testing_loss_vs_allEpochs' + '.pdf')
+            plt.close()           
+
+        if testOnly_b == 0:#just means that we're running a regular trianing/testing session     
+            
+            runDataFile = open(runDataFileName, 'a') #Obs: this will overwrite an existing file with the same name
+            
+            s = " " + "\n"  
+            s += 'used this core model: ' + usedThisModel  + "\n" 
+            if onlyOneRandomChromo_b == 1:
+                s += "Only read in data from one randomly chosen chromosome per task:"  + "\n"
+                s += "Test data from chromosome: " + genomeSeqSourceTest  + "\n"
+            s += 'Performance after outer iter ' + str(n) + ' on test set, loss and accuracy resp.: ' + str(score) + ' ' + str(acc) + "\n"               
+            runDataFile.write(s)
+            runDataFile.close()
+
+
 
 '''
 TODO: Make sure all arguments are properly handled by the existing code
+WARNING: This version of the code uses the same file for both training and evaluation.
+         The genome is extremely long so it's unlikely that the model will randomly
+         train / evaluate on the same sequence. Nevertheless, this is possible.
+         We should think about how to split out parts of the genome for train / eval,
+         or use a differen reference genome for evaluation.
 '''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train an LSTM on DNA sequences")
@@ -1725,14 +1730,17 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default = '.')
     parser.add_argument("--rootGenome", type=str, default="data/")
     parser.add_argument("--fileName", type=str, default="hg19.fa")
-    parser.add_argument("--on_binf_b", type=int, default = 0)
+    parser.add_argument("--on_binf_b", type=int, default = 1)
     parser.add_argument("--avoidChromo", nargs="+", default = 'chrX chrY chrM chr15 chr22') 
     parser.add_argument("--outputEncodedInt_b", type=int, default=0)
     parser.add_argument("--labelsCodetype", type=int, default = 0)  #1: base pair prediction
+    parser.add_argument("--outputGenomeString_b", type=int, default=1)
+    parser.add_argument("--outputEncoded_b", type=int, default=1)
     ####################################################
     #Set up training schedule, model and run:
     ####################################################
     parser.add_argument("--model", type=str, default="Conv1DLSTM", choices=["Conv1DLSTM", "LSTM"])
+    parser.add_argument("--reloadModel", type=int, default=0)
     parser.add_argument("--nrOuterLoops", type=int, default=1)
     parser.add_argument("--firstIterNr", type=int, default=0)
     parser.add_argument("--nrOfRepeats", type=int, default=5)
@@ -1742,9 +1750,10 @@ if __name__ == "__main__":
     parser.add_argument("--batchSize", type=int, default=512)
     parser.add_argument("--stepsPerEpoch", type=int, default=100)
     parser.add_argument("--trainDataIntervalStepSize", type=str, default='2000000')
-    parser.add_argument("--trainDataInterval", nargs="+", type=str, default='00000000 10000000')
+    parser.add_argument("--trainDataInterval", nargs="+", type=str, default='0 10000000')
     parser.add_argument("--nrTestSamples", type=int, default=500000)
     parser.add_argument("--testDataInterval", nargs="+", default='10000000 12000000')
+    parser.add_argument("--genRandomSamples_b", type=int, default=0)
     ####################################################
     #Modelling spec's
     ####################################################
@@ -1763,8 +1772,7 @@ if __name__ == "__main__":
     ####################################################
     #LSTMs:
     ####################################################
-    parser.add_argument("--nrOfParallelLSTMstacks", type=int, default = 1)
-    parser.add_argument("--nrLSTMlayers", type=int, default = 2)
+    parser.add_argument("--nrOfParallelLSTMstacks", type=int, default = 2)
     parser.add_argument("--tryAveraging_b", type=int, default = 1)
     parser.add_argument("--embedUnits", type=int, default = 128)
     parser.add_argument("--dropout_emb", type=float, default= 0.)
@@ -1808,6 +1816,11 @@ if __name__ == "__main__":
     modelName = 'models/modelLSTM_' + args.subStr
     modelDescr = args.subStr
 
+    print(args.genRandomSamples_b)
+    if args.genRandomSamples_b == 0:
+        print("Using the new data generator and genRandomSamples=0 is broken.")
+        sys.exit(0)
+
     # Let's try to correctly parse this list of hidden unit sizes in the FC
     if type(args.hiddenUnits) is list:
         if len(args.hiddenUnits) == 1:
@@ -1817,6 +1830,11 @@ if __name__ == "__main__":
     elif type(args.hiddenUnits) is str:
         # This is the default value
         hiddenUnits = [int(x) for x in args.hiddenUnits.split()]
+
+    if type(args.trainDataInterval) is list:
+        args.trainDataInterval = [x for x in args.trainDataInterval]
+    elif type(args.trainDataInterval) is str:
+        args.trainDataInterval = [x for x in args.trainDataInterval.split()]
 
     if args.model == "Conv1DLSTM":
         args.outputEncodedInt_b = 0
@@ -1838,7 +1856,7 @@ if __name__ == "__main__":
                                           flankSizeFrqModel = args.flankSizeFrqModel, 
                                           modelName = modelName, 
                                           trainDataIntervalStepSize = args.trainDataIntervalStepSize, 
-                                          trainDataInterval0 = args.trainDataInterval.split(), 
+                                          trainDataInterval0 = args.trainDataInterval, 
                                           nrTestSamples = args.nrTestSamples, 
                                           testDataInterval = args.testDataInterval,
                                           genSamples_b = args.genSamples_b,
@@ -1862,7 +1880,11 @@ if __name__ == "__main__":
                                           on_binf_b = args.on_binf_b, 
                                           path = args.path, 
                                           testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b,
-                                          outputEncodedInt_b = args.outputEncodedInt_b
+                                          outputEncoded_b = args.outputEncoded_b,
+                                          outputEncodedInt_b = args.outputEncodedInt_b,
+                                          reload_model = args.reloadModel,
+                                          outputGenomeString_b = args.outputGenomeString_b,
+                                          genRandomSamples_b = genRandomSamples_b
                                           )
     elif args.model == "LSTM":
         args.convLayers_b = 0
@@ -1873,9 +1895,9 @@ if __name__ == "__main__":
                                           genomeFileName = fileGenome, 
                                           labelsCodetype = args.labelsCodetype, 
                                           modelName = modelName,
+                                          on_binf_b = args.on_binf_b, 
                                           # Model hyperparameters
                                           convLayers_b = args.convLayers_b, 
-                                          nrLSTMlayers = args.nrLSTMlayers, 
                                           nrOfParallelLSTMstacks = args.nrOfParallelLSTMstacks,
                                           LSTMUnits = args.LSTMUnits,
                                           skipConnectEmbeddings = args.skipConnectEmbeddings,
@@ -1889,6 +1911,7 @@ if __name__ == "__main__":
                                           dropout_emb = args.dropout_emb,
                                           dropout_lstm = args.dropout_lstm,
                                           dropout_output = args.dropout_output,
+                                          reload_model = args.reloadModel,
                                           # Optimization 
                                           optimizer = args.optimizer, 
                                           learningRate = args.learningRate, 
@@ -1902,18 +1925,22 @@ if __name__ == "__main__":
                                           # Arguments for encoding the data
                                           outputEncodedInt_b = args.outputEncodedInt_b,
                                           outputEncodedOneHot_b = 0,
+                                          outputEncoded_b = args.outputEncoded_b,
+                                          outputGenomeString_b = args.outputGenomeString_b,
                                           # Arguments for defining the training and test data
                                           customFlankSize = args.customFlankSize, 
                                           trainDataIntervalStepSize = args.trainDataIntervalStepSize, 
-                                          trainDataInterval0 = args.trainDataInterval.split(),
+                                          trainDataInterval0 = args.trainDataInterval,
                                           nrTestSamples = args.nrTestSamples, 
                                           testDataInterval = args.testDataInterval,
                                           testDataIntervalIdTotrainDataInterval_b = args.testDataIntervalIdTotrainDataInterval_b,
                                           genSamples_b = args.genSamples_b,
+                                          nrOuterLoops = args.nrOuterLoops,
+                                          genRandomSamples_b = args.genRandomSamples_b,
                                           # Arguments for defining the training loop
                                           nrEpochs = args.nrEpochs, 
                                           augmentWithRevComplementary_b = args.augmentWithRevComplementary_b, 
                                           batchSize = args.batchSize, 
                                           stepsPerEpoch = args.stepsPerEpoch, 
-                                          shuffle_b = args.shuffle_b
+                                          shuffle_b = args.shuffle_b,
                                           )

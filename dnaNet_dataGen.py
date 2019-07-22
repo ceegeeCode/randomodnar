@@ -3223,8 +3223,9 @@ def genSamplesForDynamicSampling_I(nrSamples,
         i = 0
         for i in range(nrSamples):
             
-            #Get random site unless we want to simply get the nrSamples samples from a running window of
-            #length 2*flankSize across the selected part of the genome:
+            # Get random site unless we want to simply get the nrSamples samples from a running window of
+            # length 2*flankSize across the selected part of the genome:
+            # TODO? Redefine the selection of the random idx so that the batch is created from that point onwards to ensure coherence of the samples within a batch
             if genRandomSamples_b == 0:
                 idx = flankSize + i
             else:

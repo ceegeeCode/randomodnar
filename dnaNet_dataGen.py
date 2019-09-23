@@ -75,10 +75,14 @@ codeC = [0,1,0,0]
 codeG = [0,0,1,0]
 codeT = [0,0,0,1]
 
+codeW = [3,3,3,3] #an array diff form the one-hots fopr ACGT and easy to recognize
+
 codeA_asArray = np.asarray(codeA, dtype ='int8')
 codeC_asArray = np.asarray(codeC, dtype ='int8')
 codeG_asArray = np.asarray(codeG, dtype ='int8')
 codeT_asArray = np.asarray(codeT, dtype ='int8')
+
+codeW_asArray = np.asarray(codeW, dtype ='int8')
 
 #codeA_asArray = np.asarray(codeA, dtype ='float32')
 #codeC_asArray = np.asarray(codeC, dtype ='float32')
@@ -91,6 +95,7 @@ codeC_asInt = 1
 codeG_asInt = 2
 codeT_asInt = 3
 
+codeW_asInt = 7
 
 #for base pair encoding
 codeAT = [1,0]
@@ -380,7 +385,97 @@ def delta4(n):
     x[n] = 1
     return x
         
+         
+###################################################################
+## Utils for restructering data
+###################################################################
+    
+
+def splitGeneomeInChromosomes(root, genomeFileName, genomeShortName, rootOut, chromoNameBound = 10):
+    
+    '''As first part of readGenome/fastReadGenome, but spits out the strings for each chromo
+    to a file. Fiels are named: [genomeShortName]_chr*.txt, with * = chr number.'''
+    
+    pathToGenomeFile =root +  genomeFileName
+    handle = open(pathToGenomeFile)
+    accumulatedLength = 0
+    lineCnt = 0
+    currChromo = ''
+    currChromoFile  = ''
+    Xchr = ''
+    chromoList = []
+    lenChr = 0
+    posInChr = 0
+    
+
+    # Loop through the file to find the diff chromo's, their lengths and check if the exonic-info seq's match in length
+    while True:
+        lines = handle.readlines(100000)  # read in chunks of 100,000 lines http://effbot.org/zone/readline-performance.htm 
+        if not lines:
+            break  # no more lines to read
+
+        for line in lines:
         
+            v = line.strip()
+
+            if lineCnt == 0:
+                print("Genome data file 1st line:\n ", line)
+            
+            #skip lines with a '>'; these header lines will preceed the dna-seq
+            #or the dna-seq for each chromosome 
+            if '>' in v:
+                
+                print v
+                # only check the length of line when necessary
+                if len(v[1:]) < chromoNameBound:  
+                
+                    if currChromo != '':
+                        currChromoFile .close()
+                        
+#                        chromoList.append([currChromo, lenChr])  
+                        
+                        
+                        #Write string to file:
+
+               
+                    currChromo = v[1:]
+                    if v[2] != ' ':
+                        currNr = v[1:3]
+                    else:
+                        currNr = v[1]
+                    
+                    currChromoFilePath = rootOut + genomeShortName + '_' + 'chr' + currNr + '.txt'
+                    currChromoFile = open(currChromoFilePath, 'a')
+                    currChromoFile.write(line)
+                    chromoList.append([currChromo, lenChr])    
+                    print("Found data for this chromosome: %s" % currChromo)
+                    Xchr = ''
+                    lenChr = 0
+                    posInChr = 0
+                                     
+            else:
+                thisLength = len(v)
+                lenChr += thisLength
+                accumulatedLength += thisLength
+                posInChr += thisLength
+
+                Xchr += v 
+                currChromoFile.write(line)
+#                Xall += v
+#                lenXall += len(v)
+#            
+                    
+            lineCnt += 1 
+
+    handle.close()
+
+    #record for lastly passed chromo too:
+    chromoList.append([currChromo, lenChr])    
+            
+    print(chromoList)
+        
+#        print("Length of genome sequence read in:%d" % lenXall)
+
 
     
     
@@ -919,49 +1014,53 @@ def readGenome(fileName,
             raw_input("Warning: lengths of exonic info and dna-seq differ!")
         
         #not all letters are ACGT!:
+        cntNotACGT = 0
         for i in range(lenXall):
                             
-            try:
-                if Xall[i] == 'A':            
-                    X += 'A'
-                    Xrepeat.append(0)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'T':     
-                    X += 'T'
-                    Xrepeat.append(0)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'C':    
-                    X += 'C'
-                    Xrepeat.append(0)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'G':    
-                    X += 'G'
-                    Xrepeat.append(0)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'a':            
-                    X += 'A'
-                    Xrepeat.append(1)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 't':     
-                    X += 'T'
-                    Xrepeat.append(1)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'c':    
-                    X += 'C'
-                    Xrepeat.append(1)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] == 'g':    
-                    X += 'G'
-                    Xrepeat.append(1)
-                    Xexonic.append(XexonicAll[i])
-                        
-            except IndexError:
-                print("Letter is: %s so not ACGTacgt at: %d" % (Xall[i],i))
+            if Xall[i] == 'A':            
+                X += 'A'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'T':     
+                X += 'T'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'C':    
+                X += 'C'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'G':    
+                X += 'G'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'a':            
+                X += 'A'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 't':     
+                X += 'T'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'c':    
+                X += 'C'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] == 'g':    
+                X += 'G'
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            else:
+                X += 'W'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+                cntNotACGT +=1
+                if VERBOSE:   
+                    print("Letter is: %s so not ACGTacgt at: %d" % (Xall[i],i))
                 
                 
         #If desired the letters will be "one-hot" encoded:
         lenX = len(X)
-        print("Length genome sequence, only ACGT's:%d" % lenX)
+        print("Length genome sequence, only ACGT's:%d; not ACGT's: %d" % (lenX - cntNotACGT, cntNotACGT))
         
         
         
@@ -1179,65 +1278,74 @@ def readGenome(fileName,
             trailing_b = 0
             headingNs = 0
             trailingNs = 0
+            cntNotACGT = 0
             for i in range(lenXchrAll):
                 
-                try:
-                    if XchrAllDict[chromo][i] == 'A':            
-                        Xchr += 'A'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'T':     
-                        Xchr += 'T'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'C':    
-                        Xchr += 'C'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'G':    
-                        Xchr += 'G' 
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'a':            
-                        Xchr += 'A'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 't':     
-                        Xchr += 'T'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'c':    
-                        Xchr += 'C'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'g':    
-                        Xchr += 'G' 
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    else:
-                        if XchrAllDict[chromo][i] == 'N':   
-                            if trailing_b == 1:
-                                trailingNs += 1
-                            else:
-                                headingNs += 1
-                except IndexError:
-                    print("Letter is %s so not ACGTacgt at: %d" % (XchrAllDict[chromo][i], i))
-                    print("... or exonic info at %d is not found; exonic info file is %s" % (i,exonicInfoBinaryFileName ))
+                if XchrAllDict[chromo][i] == 'A':            
+                    Xchr += 'A'
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'T':     
+                    Xchr += 'T'
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'C':    
+                    Xchr += 'C'
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'G':    
+                    Xchr += 'G' 
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'a':            
+                    Xchr += 'A'
+                    XchrRepeat.append(1)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 't':     
+                    Xchr += 'T'
+                    XchrRepeat.append(1)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'c':    
+                    Xchr += 'C'
+                    XchrRepeat.append(1)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                elif XchrAllDict[chromo][i] == 'g':    
+                    Xchr += 'G' 
+                    XchrRepeat.append(1)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    trailing_b = 1
+                else:
+                    Xchr += 'W' 
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    cntNotACGT +=1
+                    
+                    #Only if N's can only be heading or trailing does this makes good sense for the railing ones; the heading-N count is ok:
+                    if XchrAllDict[chromo][i] == 'N':   
+                        if trailing_b == 1:
+                            trailingNs += 1
+                        else:
+                            headingNs += 1
+                        
+                    if VERBOSE:   
+                        print("Letter is: %s so not ACGTacgt at: %d" % (XchrAllDict[chromo][i],i))
+                
+                    
+                    
             XchrDict[chromo] = Xchr
             XchrRepeatDict[chromo] = XchrRepeat
             XchrExonicDict[chromo] = XchrExonic
             XchrNsDict[chromo] = [headingNs, trailingNs]
             
             lenXchr = len(XchrDict[chromo])  
-#            print("S .. ?", lenXchr)
+            print("Length genome sequence, for chromo %s: only ACGT's:%d; not ACGT's: %d" % (chromo, lenXchr - cntNotACGT, cntNotACGT))
  
 
         return XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
@@ -1245,12 +1353,14 @@ def readGenome(fileName,
 
 def fastReadGenome(fileName, 
                exonicInfoBinaryFileName = '',
-               chromoNameBound = 10, 
+               chromoNameBound = 1000, 
                startAtPosition = 0,
                endAtPosition = int(1e26), #some gigantic number
                outputAsDict_b = 0,
                outputGenomeString_b =0,
                randomChromo_b = 0, 
+               onlyTheseChromos_b = 0,
+               onlyTheseChromos = [],
                avoidChromo = []):
     
     '''
@@ -1312,7 +1422,7 @@ def fastReadGenome(fileName,
     XchrDict = {} #dict to map: each chromosome to list [its length, sequence(only ACGT's)]
     XchrRepeatDict = {} #repeat info corr to XchrDict
     XchrExonicDict = {} #exonic info corr to XchrDict
-    XchrNsDict = {} #to collect the number of heading,trailing ends for each chromo
+#    XchrNsDict = {} #to collect the number of heading,trailing ends for each chromo
     lineCnt = 0
     lenXall = 0
     lenX = 0
@@ -1413,42 +1523,27 @@ def fastReadGenome(fileName,
         if lenXall != len(XexonicAll):
             input("Warning: lengths of exonic info and dna-seq differ!")
         
-
-        if exonicInfoBinaryFileName == '':
-            ''' 
-            Takes   0.6941s trainDataInterval = [0,   10000000]
-            Takes 208s      trainDataInterval = [0, 3000000000] 
-            '''
-            X = Xall.replace("N","")  # Remove the 'N' bases
-            Xrepeat = [base.islower() for base in X]  # 1 iff a/t/c/g else 0
-            X = X.upper()  # uppercase everything in X
-            Xexonic = str(0) * len(X)  # despicable hack but super fast
-        else:
-            ''' 
-            Takes 4.965s trainDataInterval = [0,   10000000]
-            Takes ?????s trainDataInterval = [0, 3000000000]
-            '''
-            #  not all letters are ACGT!:
-            zeroSet = {'A', 'T', 'C', 'G'}
-            oneSet  = {'a', 't', 'c', 'g'}
-
-            # Find the locations of all the 'N's that we will remove
-            # -- used to grab the correct parts of XexonicAll
-            for i in range(lenXall):
-                if i % 100000000 == 0:
-                    print("ACGTacgt checked {} tokens".format(i))
-                if Xall[i] in zeroSet:
-                    X += Xall[i]
-                    Xrepeat.append(0)
-                    Xexonic.append(XexonicAll[i])
-                elif Xall[i] in oneSet:
-                    X += Xall[i].upper()
-                    Xrepeat.append(1)
-                    Xexonic.append(XexonicAll[i])
-                else:
-                    # It isn't an IndexError so we shouldn't call one
-                    if VERBOSE:
-                    	print("Letter %s not ACGTacgt at: %d" % (Xall[i],i))
+        #not all letters are ACGT!:
+        zeroSet = {'A', 'T', 'C', 'G'}
+        oneSet  = {'a', 't', 'c', 'g'}
+        for i in range(lenXall):
+            if i % 100000000 == 0:
+                print("ACGTacgt checked {} tokens".format(i))
+            if Xall[i] in zeroSet:
+                X += Xall[i]
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+            elif Xall[i] in oneSet:
+                X += Xall[i].upper()
+                Xrepeat.append(1)
+                Xexonic.append(XexonicAll[i])
+            else:
+                X += 'W'
+                Xrepeat.append(0)
+                Xexonic.append(XexonicAll[i])
+                # It isn't an IndexError so we shouldn't call one
+                if VERBOSE:
+                	print("Letter %s not ACGTacgt at: %d" % (Xall[i],i))
 
         #If desired the letters will be "one-hot" encoded:
         lenX = len(X)
@@ -1653,6 +1748,8 @@ def fastReadGenome(fileName,
         
          
         #Not all letters are ACGT! We read the seq's in to dict's holding only ACGTacgt's:
+        zeroSet = {'A', 'T', 'C', 'G'}
+        oneSet  = {'a', 't', 'c', 'g'}
         for chromo in XchrAllDict.keys():
             
             print("Now at chromosome: %s" % chromo)
@@ -1665,76 +1762,41 @@ def fastReadGenome(fileName,
             
             print("Length of this genome sequence:%d" % lenXchrAll)
             
-            trailing_b = 0
-            headingNs = 0
-            trailingNs = 0
+            cntNotACGT = 0
             for i in range(lenXchrAll):
                 
-                try:
-                    if XchrAllDict[chromo][i] == 'A':            
-                        Xchr += 'A'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'T':     
-                        Xchr += 'T'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'C':    
-                        Xchr += 'C'
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'G':    
-                        Xchr += 'G' 
-                        XchrRepeat.append(0)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'a':            
-                        Xchr += 'A'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 't':     
-                        Xchr += 'T'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'c':    
-                        Xchr += 'C'
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    elif XchrAllDict[chromo][i] == 'g':    
-                        Xchr += 'G' 
-                        XchrRepeat.append(1)
-                        XchrExonic.append(XchrExonicAllDict[chromo][i])
-                        trailing_b = 1
-                    else:
-                        if XchrAllDict[chromo][i] == 'N':   
-                            if trailing_b == 1:
-                                trailingNs += 1
-                            else:
-                                headingNs += 1
-                except IndexError:
-                    print("Letter is %s so not ACGTacgt at: %d" % (XchrAllDict[chromo][i], i))
-                    print("... or exonic info at %d is not found; exonic info file is %s" % (i,exonicInfoBinaryFileName ))
+                if i % 100000000 == 0:
+                    print("ACGTacgt checked {} tokens".format(i))
+                    
+                if XchrAllDict[chromo][i] in zeroSet:            
+                    Xchr += XchrAllDict[chromo][i]
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                elif XchrAllDict[chromo][i] in oneSet:            
+                    Xchr += XchrAllDict[chromo][i].upper()
+                    XchrRepeat.append(1)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                else:
+                    Xchr += 'W' 
+                    XchrRepeat.append(0)
+                    XchrExonic.append(XchrExonicAllDict[chromo][i])
+                    cntNotACGT +=1
+
+                                
             XchrDict[chromo] = Xchr
             XchrRepeatDict[chromo] = XchrRepeat
             XchrExonicDict[chromo] = XchrExonic
-            XchrNsDict[chromo] = [headingNs, trailingNs]
             
             lenXchr = len(XchrDict[chromo])  
-#            print("S .. ?", lenXchr)
+            print("Length genome sequence, for chromo %s: only ACGT's:%d; not ACGT's: %d" % (chromo, lenXchr - cntNotACGT, cntNotACGT))
  
 
-        return XchrAllDict, XchrDict, XchrRepeatDict, XchrExonicDict, XchrNsDict
+        return XchrAllDict, XchrDict, XchrRepeatDict,  {} #the empty dixt is just placeholder for the heading-trailing N info dict (which we do not care about here, for the sake of cutting down processing time) 
 
 
 def encodeGenome(fileName, 
                exonicInfoBinaryFileName = '',
-               chromoNameBound = 10, 
+               chromoNameBound = 1000, 
                startAtPosition = 0,
                endAtPosition = int(1e26), #some gigantic number
                outputEncoded_b = 1,
@@ -1746,7 +1808,7 @@ def encodeGenome(fileName,
                randomChromo_b = 0, 
                avoidChromo = []):
     ''' Reads in genome in fasta format by encoding the letters as 
-    defined by codeA, codeT, codeC and codeG. 
+    defined by codeA, codeT, codeC and codeG. Not-ACGT's are encoded as wild-card (W), codeW.
 
     Input:
     chromoNameBound: allows to set a bound on the names of the chromosomes for 
@@ -1781,6 +1843,9 @@ def encodeGenome(fileName,
     codeT = [0,0,0,1]
     
     This conversion is case insensitive (ie repeat masking is not encoded).
+    Not-ACGT's in the genome string are encoded as wild-cards, and by the array
+    
+    codeW = [3,3,3,3]
     
     outputGenomeString_b: if outputEncoded_b == 1 the genome string will be 
     output (as third part of output tuple) when setting this parameter 
@@ -1843,11 +1908,7 @@ def encodeGenome(fileName,
         #If desired the letters will be "one-hot" encoded:
         lenX = len(X)
         print("Length genome sequence, only ACGT's:%d" % lenX)
-
-        if outputGenomeString_b == 1:
-            return X, Xrepeat, None, X
-        else:
-            return _, _, _
+        
         if outputEncoded_b == 1:
             
             if outputEncodedOneHot_b == 1:
@@ -1857,25 +1918,25 @@ def encodeGenome(fileName,
                 XencExonic = np.zeros(shape = lenX, dtype = 'int8') #'int' better than 'int8'? -- we only need a boolean
                 
                 for i in range(lenX):
-            
+
+                    XencRepeat[i] = Xrepeat[i]
                     try:
-                        XencRepeat[i] = Xrepeat[i]
-                        try:
-                            XencExonic[i] = int(Xexonic[i])
-                        except ValueError:
-                            print("At pos %d set exonic info to 2 (other)" % i)
-                            XencExonic[i] = 2
-                        
-                        if X[i] == 'A':            
-                            Xenc[i] = codeA_asArray
-                        elif X[i] == 'T':     
-                            Xenc[i] = codeT_asArray
-                        elif X[i] == 'C':    
-                            Xenc[i] = codeC_asArray
-                        elif X[i] == 'G':    
-                            Xenc[i] = codeG_asArray
-                    except IndexError:
-                        print("Letter is: %s so not ACGTacgt at: %d" % (X[i],i))
+                        XencExonic[i] = int(Xexonic[i])
+                    except ValueError:
+                        print("At pos %d set exonic info to 2 (other)" % i)
+                        XencExonic[i] = 2
+                    
+                    if X[i] == 'A':            
+                        Xenc[i] = codeA_asArray
+                    elif X[i] == 'T':     
+                        Xenc[i] = codeT_asArray
+                    elif X[i] == 'C':    
+                        Xenc[i] = codeC_asArray
+                    elif X[i] == 'G':    
+                        Xenc[i] = codeG_asArray
+                    else:
+                        Xenc[i] = codeW_asArray #wild-card array
+
                 
                 if outputGenomeString_b == 1:
                     return Xenc, XencRepeat, XencExonic, X
@@ -1893,26 +1954,26 @@ def encodeGenome(fileName,
                 
                 for i in range(lenX):
             
-                    try:
-                        XencRepeat[i] = Xrepeat[i]
-                        XencExonic[i] = int(Xexonic[i])
-                        
-                        if X[i] == 'A':            
-                            Xenc[i] = codeA_asInt
-                        elif X[i] == 'T':     
-                            Xenc[i] = codeT_asInt
-                        elif X[i] == 'C':    
-                            Xenc[i] = codeC_asInt
-                        elif X[i] == 'G':    
-                            Xenc[i] = codeG_asInt
-                    except IndexError:
-                        print("Letter is: %s so not ACGTacgt at: %d" % (X[i],i))
+                    XencRepeat[i] = Xrepeat[i]
+                    XencExonic[i] = int(Xexonic[i])
+                    
+                    if X[i] == 'A':            
+                        Xenc[i] = codeA_asInt
+                    elif X[i] == 'T':     
+                        Xenc[i] = codeT_asInt
+                    elif X[i] == 'C':    
+                        Xenc[i] = codeC_asInt
+                    elif X[i] == 'G':    
+                        Xenc[i] = codeG_asInt
+                    else:
+                        Xenc[i] = codeW_asInt #int for wild-card 
                  
                 if outputGenomeString_b == 1:
                     return Xenc, XencRepeat, XencExonic, X
                     
                 else:
                     return Xenc, XencRepeat, XencExonic
+        
         
         else:# outputEncoded_b == 0:
     
@@ -1956,22 +2017,20 @@ def encodeGenome(fileName,
                     
                     for i in range(lenXchr):
                 
-                        try:                            
-    
-                            XencRepeatDict[chromo][i] = XchrRepeatDict[chromo][i]
-                            XencExonicDict[chromo][i] = int(XchrExonicDict[chromo][i])
-                            
-                            if XchrDict[chromo][i] == 'A':            
-                                XencDict[chromo][i] = codeA_asArray
-                            elif XchrDict[chromo][i] == 'T':     
-                                XencDict[chromo][i] = codeT_asArray
-                            elif XchrDict[chromo][i] == 'C':    
-                                XencDict[chromo][i] = codeC_asArray
-                            elif XchrDict[chromo][i] == 'G':    
-                                XencDict[chromo][i] = codeG_asArray
-                        except IndexError:
-                            print("Letter is %s so not ACGTacgt at: %d" % (XchrDict[chromo][i], i))
-                            print("... or repeat or exonic info is not found at %d" % i)
+                        XencRepeatDict[chromo][i] = XchrRepeatDict[chromo][i]
+                        XencExonicDict[chromo][i] = int(XchrExonicDict[chromo][i])
+                        
+                        if XchrDict[chromo][i] == 'A':            
+                            XencDict[chromo][i] = codeA_asArray
+                        elif XchrDict[chromo][i] == 'T':     
+                            XencDict[chromo][i] = codeT_asArray
+                        elif XchrDict[chromo][i] == 'C':    
+                            XencDict[chromo][i] = codeC_asArray
+                        elif XchrDict[chromo][i] == 'G':    
+                            XencDict[chromo][i] = codeG_asArray
+                        else:
+                            XencDict[chromo][i] = codeW_asArray #wild-card array
+
                             
             elif outputEncodedInt_b == 1:
                 
@@ -1984,24 +2043,22 @@ def encodeGenome(fileName,
                     XencExonicDict[chromo] = np.zeros(shape = lenXchr, dtype = 'int8') #'int' better than 'int8'? -- we only need a boolean
                     
                     for i in range(lenXchr):
-                
-                        try:                            
-    
-                            XencRepeatDict[chromo][i] = XchrRepeatDict[chromo][i]
-                            XencExonicDict[chromo][i] = int(XchrExonicDict[chromo][i])
-                            
-                            if XchrDict[chromo][i] == 'A':            
-                                XencDict[chromo][i] = codeA_asInt
-                            elif XchrDict[chromo][i] == 'T':     
-                                XencDict[chromo][i] = codeT_asInt
-                            elif XchrDict[chromo][i] == 'C':    
-                                XencDict[chromo][i] = codeC_asInt
-                            elif XchrDict[chromo][i] == 'G':    
-                                XencDict[chromo][i] = codeG_asInt
+
+                        XencRepeatDict[chromo][i] = XchrRepeatDict[chromo][i]
+                        XencExonicDict[chromo][i] = int(XchrExonicDict[chromo][i])
+                        
+                        if XchrDict[chromo][i] == 'A':            
+                            XencDict[chromo][i] = codeA_asInt
+                        elif XchrDict[chromo][i] == 'T':     
+                            XencDict[chromo][i] = codeT_asInt
+                        elif XchrDict[chromo][i] == 'C':    
+                            XencDict[chromo][i] = codeC_asInt
+                        elif XchrDict[chromo][i] == 'G':    
+                            XencDict[chromo][i] = codeG_asInt
+                        else:
+                            XencDict[chromo][i] = codeW_asInt #int for wild-card
+
                                 
-                        except IndexError:
-                            print("Letter not ACGTacgt at: %d" % i)
-        
         
         #Structure final output
         if outputEncoded_b == 1:
@@ -2264,8 +2321,10 @@ def generateExonicInfoFromFile(inputFilename, genomeFilename, chromoNameBound = 
 
 
 #Mangler: augment ... delen
-def getAllSamplesFromGenome(genomeData, 
+def getAllSamplesFromGenome(encodedGenomeData,
                             labelsCodetype = 0,
+                            cutDownNrSamplesTo = 1e26,
+                            genSamplesAtRandom_b = 0,
                             outputEncodedOneHot_b = 1,
                             outputEncodedInt_b = 0,
                             outputEncodedType = 'int8',
@@ -2274,19 +2333,39 @@ def getAllSamplesFromGenome(genomeData,
                             shuffle_b = 0, 
                             inner_b = 1, 
                             shuffleLength = 5,
-                            augmentWithRevComplementary_b = 0, 
-                            cutDownNrSamplesTo = 1e26):
-    '''Get all "samples" of flanks and corr midpoints moving across a genome.
+                            augmentWithRevComplementary_b = 0):
+    '''Get all "samples" of flanks and corr midpoints moving across a genome. Important: this will get the encoded bases at all positions, also
+    those containing a not-ACGT letter! So to use the output, handling the non-qualified letters (encoded by the array for the wild card, W) 
+    must be done in the application. 
+    
+    It is though possible to get samples at random positions (of the loaded genome data); for this set genSamplesAtRandom_b = 1 and use
+    cutDownNrSamplesTo to set a number of samples lower than the length of the loaded genome data.
+    
     Input:
-    genomeData: tuple dna-sequence, repeat info, exonic info as returned be readGenome
+    encodedGenomeData: encoded tuple dna-sequence, repeat info, exonic info as returned be encodeGenome
+    
+    Output: list X, Y, R, Q, sampledPositions where
+    
+    X: the set of left and right hand side flanks (of the set flankSize) for each position in the input (encoded genome seq)
+    Y: the set of "labels" corr to X, ie the set of encoded bases for each position (: Y[i] is the base in the middle of the flanks X[i])
+    R: boolean indicating whether the position is a repeat (1) or not (0)
+    Q: boolean indicating whether the position is qulified (1) or not (0); a position, i, is qualified if the flanks X[i] and the base at i, Y[i],  consists
+    in ACGT's only (so disqualified if containing a single "wild card" -- a not-ACGT)
+    sampledPositions: an array containing all sampled positions (index in the encoded genome seq)
+
     '''
     
-    genomeSeq, repeatInfoSeq, exonicInfoSeq =  genomeData
+        
+    genomeSeq, repeatInfoSeq, exonicInfoSeq =  encodedGenomeData
 
     #First sample is at idx flankSize, last at len(genomeData) - flankSize: 
-    nrSamples = len(genomeSeq) - 2*flankSize -1
+    lenGenomeSeq = genomeSeq.shape[0]
+    nrSamples = lenGenomeSeq - 2*flankSize -1
+    print("Length of encoded genome sequence read in: ", lenGenomeSeq)
 
-    nrSamples = min(cutDownNrSamplesTo, nrSamples)
+    nrSamples = int(min(cutDownNrSamplesTo, nrSamples))
+    
+    print("Nr of samples to be generated: ", nrSamples)
 
 #    firstSampleAt = flankSize
 #    lastSampleAt = len(genomeData) - flankSize
@@ -2312,11 +2391,13 @@ def getAllSamplesFromGenome(genomeData,
                 X = np.zeros(shape = (2*nrSamples, 2*flankSize,4), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (2*nrSamples, labelShape), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = 2*nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
-    
+                Q = np.ones(shape = 2*nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
+                
             else:
                 X = np.zeros(shape = (nrSamples, 2*flankSize,4), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (nrSamples, labelShape), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
     
         except MemoryError:
             
@@ -2327,10 +2408,13 @@ def getAllSamplesFromGenome(genomeData,
                 X = np.zeros(shape = (2*nrSamples, 2*flankSize,4), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (2*nrSamples, labelShape), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = 2*nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = 2*nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
+                
             else:
                 X = np.zeros(shape = (nrSamples, 2*flankSize,4), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (nrSamples, labelShape), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
             
     elif outputEncodedInt_b == 1:
 
@@ -2339,11 +2423,13 @@ def getAllSamplesFromGenome(genomeData,
                 X = np.zeros(shape = (2*nrSamples, 2*flankSize), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (2*nrSamples), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = 2*nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = 2*nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
     
             else:
                 X = np.zeros(shape = (nrSamples, 2*flankSize), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (nrSamples), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
     
         except MemoryError:
             
@@ -2354,67 +2440,105 @@ def getAllSamplesFromGenome(genomeData,
                 X = np.zeros(shape = (2*nrSamples, 2*flankSize), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (2*nrSamples), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = 2*nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
+                Q = np.ones(shape = 2*nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean?               
             else:
                 X = np.zeros(shape = (nrSamples, 2*flankSize), dtype = outputEncodedType) #to hold the flanks
                 Y = np.zeros(shape = (nrSamples), dtype = outputEncodedType) #to hold the labels
                 R = np.zeros(shape = nrSamples, dtype = 'int8') #to hold the repeat info; int8 ok for boolean? 
-   
+                Q = np.ones(shape = nrSamples, dtype = 'int8') #to hold the qualified info; int8 ok for boolean? 
             
             
 #    print "X shape", X.shape
 #    print "Y shape", Y.shape
     
-    #Loop along the genome and record the flanks and midpoints:
+    #Loop along the genome and record the flanks and mid points:
+    
+    #If genSamplesAtRandom_b == 1, we first sample a set of positions and order them (this is to be able to compare with k-mer model in likelihood ratio tests only applied to a sub sample of the genomic seq)
+    sampledPositions = np.zeros(nrSamples, dtype = 'int64') #to keep track of which positions were sampled; here a boolean indicator to make look-up easy afterwards
+    sampledPositionsBoolean = np.zeros(lenGenomeSeq, dtype = 'int8') #to keep track of which positions were sampled; here a boolean indicator to make look-up easy afterwards
+    if genSamplesAtRandom_b == 1:
+        
+        for k in range(nrSamples):
+        
+            idx = np.random.randint(flankSize,lenGenomeSeq-flankSize)
+            
+            sampledPositions[k] = idx
+            sampledPositionsBoolean[idx] = 1
+            
+        sampledPositions.sort()
+        print("sampledPositions ", sampledPositions)
+        
+    else: #all positions are "sampled"; we then only keep an indicator/boolean array of 1's, and leave the positions-array with zeros:
+
+        sampledPositions = np.arange(flankSize, lenGenomeSeq - flankSize - 1)        
+        sampledPositionsBoolean = np.ones(lenGenomeSeq, dtype = 'int8')
+        #only the first and last part both of length flankSize are not "sampled":
+        for i in range(flankSize):
+            sampledPositionsBoolean[i] = 0
+            sampledPositionsBoolean[ lenGenomeSeq - 1 - i] = 0
+    
+    
     for i in range(nrSamples):
+        
+        if genSamplesAtRandom_b == 1:
+            idx = sampledPositions[i] - flankSize #subtract flankSize as we fetch the mid-point/label from position idx + flankSize in the genome seq (see Y[i] below)
+        else: #just use the position
+            idx = i #corr's to sampledPositions[i] = i + flankSize, and so idx =  sampledPositions[i] - flankSize as above
         
         #left flank:
 #        for j in range(flankSize):
 #            X[i][j] = genomeSeq[i + j] #i + j = i + firstSampleAt - flankSize + j
-        X[i][:flankSize] = genomeSeq[i:(i + flankSize)] #i + j = i + firstSampleAt - flankSize + j
+#        print("idx, genomeSeq[idx:(idx + flankSize)] " , idx, genomeSeq[idx:(idx + flankSize)])
+        X[i][:flankSize] = genomeSeq[idx:(idx + flankSize)] #i + j = i + firstSampleAt - flankSize + j
 
         #right flank:
 #        for j in range(flankSize + 1, 2*flankSize +1):
 #            X[i][j-1] = genomeSeq[i + j]
-        X[i][flankSize:] = genomeSeq[(i + flankSize +1):(i + 2*flankSize + 1)]
+        X[i][flankSize:] = genomeSeq[(idx + flankSize +1):(idx + 2*flankSize + 1)]
+        
             
         if shuffle_b > 0.5:
 #                print "I shuffle ..."
 #            print v2
             if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                shuffleFlanks(v = X[idx], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
             elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                shuffleFlanks(v = X[idx], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
             else:
                 shuffle(X[i])          
    
         #labels at midpoint:
-        R[i] = repeatInfoSeq[i + flankSize]
+        R[i] = repeatInfoSeq[idx + flankSize]
         
         if labelsCodetype == 0:
-            Y[i] = genomeSeq[i + flankSize]
+            Y[i] = genomeSeq[idx + flankSize]
         elif labelsCodetype == 1:
-            Y[i] = basePair(genomeSeq[i + flankSize])
+            Y[i] = basePair(genomeSeq[idx + flankSize])
         elif labelsCodetype == -1:
-            Y[i] = basePairType(genomeSeq[i + flankSize])
+            Y[i] = basePairType(genomeSeq[idx + flankSize])
         elif labelsCodetype == 2:
-            if exonicInfoSeq[i + flankSize] == 1:
+            if exonicInfoSeq[idx + flankSize] == 1:
                 Y[i] = exonicInd
-            elif repeatInfoSeq[i + flankSize] == 1:
+            elif repeatInfoSeq[idx + flankSize] == 1:
                 Y[i] = repeatInd
             else:
                 Y[i] = otherInd
         elif labelsCodetype == 3: #repeat or not?
-            if repeatInfoSeq[i + flankSize] == 1:
+            if repeatInfoSeq[idx + flankSize] == 1:
                 Y[i] = repeatBinInd
             else:
                 Y[i] = notRepeatBinInd
-        
+                
+        #Determine whether the position is qualified or not, and record it in the assigned array:
+        if np.max(X[i]) > 2 or np.max(Y[i]) > 2:
+            Q[i] = 0
+                        
         
     if outputEncodedOneHot_b == 1 and convertToPict_b == 1:
         
         X = seqToPict(inputArray = X, flankSize = flankSize)
         
-    return X, Y, R
+    return X, Y, R, Q, sampledPositions, sampledPositionsBoolean
 
 
 
@@ -2455,7 +2579,7 @@ def genSamples_I(nrSamples,
     labelsCodetype: determines whether to encode the labels as bases (0 and default), base pairs (1) 
                     or base pair type (purine/pyrimidine, -1); the prediction obtained will be of the
                     chosen code type (ie if 1 is used it is only the base pair at the given position which
-                    is predicted). Pt only works with on-hot encoding.
+                    is predicted). Pt only works with one-hot encoding.
     
     
     
@@ -2532,7 +2656,7 @@ def genSamples_I(nrSamples,
     np.random.seed(seed = np.random.randint(0,2**32 -1))
     
 
-    #NOT IN WORKING ORDER
+    #NOT IN WORKING ORDER?
     if fromGenome_b == 0:
         
         i = 0
@@ -2540,11 +2664,12 @@ def genSamples_I(nrSamples,
             
             #generate random "letters", codeA, codeC, codeT, codeG
             for j in range(2*flankSize):
-                X[i][j] = np.random.randint(0,4) 
+                idx = np.random.randint(0,4) 
+                X[i][j][idx] = 1
                 
             #generate random label:
-            #NOT OK -- should retrun vector
-            Y[i] = np.random.randint(0,labelShape)
+            idx = np.random.randint(0,labelShape)
+            Y[i][idx] = 1
     
             #add reversed and complemented sequence: 
             if augmentWithRevComplementary_b == 1:
@@ -2609,12 +2734,17 @@ def genSamples_I(nrSamples,
         i = 0
         for i in range(nrSamples):
             
-            #Get random site unless we want to simply get the nrSamples samples from a running window of
-            #length 2*flankSize across the selected part of the genome:
-            if genRandomSamples_b == 0:
-                idx = flankSize + i
-            else:
-                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
+            
+                #Get random site unless we want to simply get the nrSamples samples from a running window of
+                #length 2*flankSize across the selected part of the genome:
+                if genRandomSamples_b == 0:
+                    idx = flankSize + i
+                    noQualifiedSampleObtainedYet_b = 1
+                else:
+                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+                    
                 if labelsCodetype == 0:
                     Y[i] = genomeArray[idx]
                 elif labelsCodetype == 1:
@@ -2633,84 +2763,95 @@ def genSamples_I(nrSamples,
                         Y[i] = repeatBinInd
                     else:
                         Y[i] = notRepeatBinInd
-#            print "idx:", idx
-            
-            #... and fetch the correspondning flanks:
-            if inclFrqModel_b == 0:
-                X[i][:flankSize] =  genomeArray[(idx - flankSize):idx] #left-hand flank
-                X[i][flankSize:] =  genomeArray[(idx+1):(idx + 1 + flankSize)] #right-hand flank
+    #            print "idx:", idx
                 
-            if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
-                
-                
-                genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
-                try:
-                    X[i][flankSizeOut] = frqModelDict[genString]
-                except KeyError:
-                    X[i][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
-                
-                X[i][:flankSizeOut] =  genomeArray[(idx - flankSize):(idx-exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
-                X[i][(flankSizeOut+1):] =  genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
-     
-            
-            if shuffle_b > 0.5:
-#                print "I shuffle ..."
-#            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-                else:
-                    shuffle(X[i])          
-            
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-               
-               if outputEncodedOneHot_b == 1:
+                #... and fetch the correspondning flanks:
+                if inclFrqModel_b == 0:
+                    X[i][:flankSize] =  genomeArray[(idx - flankSize):idx] #left-hand flank
+                    X[i][flankSize:] =  genomeArray[(idx+1):(idx + 1 + flankSize)] #right-hand flank
                     
-                    if inclFrqModel_b == 0:
+                if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
+                    
+                    
+                    genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
+                    try:
+                        X[i][flankSizeOut] = frqModelDict[genString]
+                    except KeyError:
+                        X[i][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
+                    
+                    X[i][:flankSizeOut] =  genomeArray[(idx - flankSize):(idx-exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
+                    X[i][(flankSizeOut+1):] =  genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
+         
+                
+                #In case we are smapling randomly and the sample contains a not-ACGT it must be discarded;
+                #if we are "sampling" a stretch of the genome, we keep all samples --- so when using the output sample
+                #the non-qulified letters/positions must be discarded there:  
+                if genRandomSamples_b > 0:
+                    
+                    if np.max(X[i]) > 2 or np.max(Y[i]) > 2:
+                        continue
+                    else:
+                        noQualifiedSampleObtainedYet_b = 1
+                
+                
+                if shuffle_b > 0.5:
+    #                print "I shuffle ..."
+    #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])          
+                
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                   
+                   if outputEncodedOneHot_b == 1:
                         
+                        if inclFrqModel_b == 0:
+                            
+                            xRev = X[i][::-1]
+                            xRevAug = map(complementArray, xRev)
+                            X[i + nrSamples] = xRevAug
+                            if labelsCodetype == 0:
+                                Y[i + nrSamples ] = complementArray(Y[i])
+                            elif labelsCodetype == 1:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == -1:
+                                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+                            elif labelsCodetype == 2:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == 3:
+                                Y[i + nrSamples ] = Y[i]
+                        
+                        if inclFrqModel_b == 1:
+                            
+                            revComplGenString = ''.join(map(complementLetter,genString))
+                            try:
+                                X[i + nrSamples][flankSizeOut] = frqModelDict[revComplGenString]
+                            except KeyError:
+                                X[i + nrSamples][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
+                            
+                            X[i + nrSamples][:flankSizeOut] = map(complementArray, X[i + nrSamples][(flankSizeOut+1):])
+                            X[i + nrSamples][(flankSizeOut+1):] =  map(complementArray, X[i + nrSamples][:flankSizeOut])
+                            if labelsCodetype == 0:
+                                Y[i + nrSamples ] = complementArray(Y[i])
+                            elif labelsCodetype == 1:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == -1:
+                                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+                            elif labelsCodetype == 2:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == 3:
+                                Y[i + nrSamples ] = Y[i]
+                        
+                  
+                   elif outputEncodedInt_b == 1:
                         xRev = X[i][::-1]
-                        xRevAug = map(complementArray, xRev)
+                        xRevAug = map(complementInt, xRev)
                         X[i + nrSamples] = xRevAug
-                        if labelsCodetype == 0:
-                            Y[i + nrSamples ] = complementArray(Y[i])
-                        elif labelsCodetype == 1:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == -1:
-                            Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-                        elif labelsCodetype == 2:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == 3:
-                            Y[i + nrSamples ] = Y[i]
-                    
-                    if inclFrqModel_b == 1:
-                        
-                        revComplGenString = ''.join(map(complementLetter,genString))
-                        try:
-                            X[i + nrSamples][flankSizeOut] = frqModelDict[revComplGenString]
-                        except KeyError:
-                            X[i + nrSamples][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
-                        
-                        X[i + nrSamples][:flankSizeOut] = map(complementArray, X[i + nrSamples][(flankSizeOut+1):])
-                        X[i + nrSamples][(flankSizeOut+1):] =  map(complementArray, X[i + nrSamples][:flankSizeOut])
-                        if labelsCodetype == 0:
-                            Y[i + nrSamples ] = complementArray(Y[i])
-                        elif labelsCodetype == 1:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == -1:
-                            Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-                        elif labelsCodetype == 2:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == 3:
-                            Y[i + nrSamples ] = Y[i]
-                    
-              
-               elif outputEncodedInt_b == 1:
-                    xRev = X[i][::-1]
-                    xRevAug = map(complementInt, xRev)
-                    X[i + nrSamples] = xRevAug
-                    Y[i + nrSamples ] = complementInt(Y[i])
+                        Y[i + nrSamples ] = complementInt(Y[i])
             
             
     if outputEncodedOneHot_b == 1 and convertToPict_b == 1:
@@ -2876,11 +3017,13 @@ def genSamples_II(nrSamples,
             
             #generate random "letters", codeA, codeC, codeT, codeG
             for j in range(2*flankSize):
-                X[i][j] = np.random.randint(0,4) 
+                idx = np.random.randint(0,4)
+                X[i][j][idx] = 1
                 
             #generate random label:
-            Y[i] = np.random.randint(0,4)
-    
+            idx = np.random.randint(0,4)
+            Y[i][idx] = 1
+            
             #add reversed and complemented sequence: 
             if augmentWithRevComplementary_b == 1:
                 
@@ -2915,76 +3058,90 @@ def genSamples_II(nrSamples,
         i = 0
         for i in range(nrSamples):
             
-            #Get random site unless we want to simply get the nrSamples samples from a running window of
-            #length 2*flankSize across the selected part of the genome:
-            if genRandomSamples_b == 0:
-                idx = flankSize + i
-            else:
-                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-            label = genomeArray[idx]
-#            print "idx:", idx
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
             
-            #... and fetch the correspondning flanks:                
-            genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
-            if len(genString) != 2*flankSizeFrqModel:
-                print("Something's rotten, lgth of genString is: ", len(genString) )
-            try:
-                predIdx = np.argmax(frqModelDict[genString])
-            except KeyError:
-                print("KeyError when reading from frqModelDict, key: ", genString)
-                predIdx = np.random.randint(4)
-
-                
-            X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
-            X[i][flankSizeOut:] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
-            
-            #the output we want records if the frqModel's bid differs from the actual label or not;
-            #either we just store this crude info (as a 1 or 0, resp.), or we store the actual dinucleo
-            #but one-hot it (in which case the labelSize must be 16):
-            if labelSize == 2:
-                
-                if np.max(label - alphabetOnehot[predIdx]) == 0:
-                    Y[i] = np.array([1,0])
+                #Get random site unless we want to simply get the nrSamples samples from a running window of
+                #length 2*flankSize across the selected part of the genome:
+                if genRandomSamples_b == 0:
+                    idx = flankSize + i
                 else:
-                    Y[i] = np.array([0,1])
+                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+                    
+                label = genomeArray[idx]
+    #            print "idx:", idx
                 
-            elif labelSize == 16:
-                
-                #the labels record the true letter (e.g A) followed by the frq-model's prediction (e.g.T), so
-                #a dinucleotide (here AT)
-                #generate a one-hot encoding for these dinucleos: 
-                #the label will be a 16 long array of zeros except a 1 at one place;
-                #AA will be [1,0,...], AC [0,1,0,...] ...
-                #CA will be [0,0,0,0,1,0,...], CC [0,0,0,0,0,1,0,...]
-                #etc:
-                n1 = np.argmax(label)
-                nonZeroIdx = 4*n1 + predIdx
-                Y[i][nonZeroIdx] = 1
-                
-            else:
-                print("Fatal error: label size must be either 2 or 16")
-                return
+                #... and fetch the correspondning flanks:                
+                genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
+                if len(genString) != 2*flankSizeFrqModel:
+                    print("Something's rotten, lgth of genString is: ", len(genString) )
+                try:
+                    predIdx = np.argmax(frqModelDict[genString])
+                except KeyError:
+                    print("KeyError when reading from frqModelDict, key: ", genString)
+                    predIdx = np.random.randint(4)
     
-    
-            
-            if shuffle_b > 0.5:
-#                print "I shuffle ..."
-#            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    
+                X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
+                X[i][flankSizeOut:] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
+                
+                #In case we are smapling randomly and the sample contains a not-ACGT it must be discarded;
+                #if we are "sampling" a stretch of the genome, we keep all samples --- so when using the output sample
+                #the non-qulified letters/positions must be discarded there:  
+                if genRandomSamples_b > 0:
+                    
+                    if np.max(X[i]) > 2 or np.max(label) > 2:
+                        continue
+                    else:
+                        noQualifiedSampleObtainedYet_b = 1
+                
+                #the output we want records if the frqModel's bid differs from the actual label or not;
+                #either we just store this crude info (as a 1 or 0, resp.), or we store the actual dinucleo
+                #but one-hot it (in which case the labelSize must be 16):
+                if labelSize == 2:
+                    
+                    if np.max(label - alphabetOnehot[predIdx]) == 0:
+                        Y[i] = np.array([1,0])
+                    else:
+                        Y[i] = np.array([0,1])
+                    
+                elif labelSize == 16:
+                    
+                    #the labels record the true letter (e.g A) followed by the frq-model's prediction (e.g.T), so
+                    #a dinucleotide (here AT)
+                    #generate a one-hot encoding for these dinucleos: 
+                    #the label will be a 16 long array of zeros except a 1 at one place;
+                    #AA will be [1,0,...], AC [0,1,0,...] ...
+                    #CA will be [0,0,0,0,1,0,...], CC [0,0,0,0,0,1,0,...]
+                    #etc:
+                    n1 = np.argmax(label)
+                    nonZeroIdx = 4*n1 + predIdx
+                    Y[i][nonZeroIdx] = 1
+                    
                 else:
-                    shuffle(X[i])          
-            
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-              
-                print("Fatal error: augmentWithRevComplementary_b is not in working order here!")
-                return 
-
-              
-            
+                    print("Fatal error: label size must be either 2 or 16")
+                    return
+        
+        
+                
+                if shuffle_b > 0.5:
+    #                print "I shuffle ..."
+    #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])          
+                
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                  
+                    print("Fatal error: augmentWithRevComplementary_b is not in working order here!")
+                    return 
+    
+                  
+                
             
     if convertToPict_b == 1:
         
@@ -3085,8 +3242,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
                      inner_b = 1, 
                      shuffleLength = 5, 
                      getFrq_b = 0,
-                     augmentWithRevComplementary_b = 1,
-                     lGenome = -1
+                     augmentWithRevComplementary_b = 1
                      ):
     '''Generate a set of nrSamples samples. This can be done either from an existing genome 
     (set fromGenome_b = 1 and supply a file name genomeFileName) or, with fromGenome_b = 0, by 
@@ -3104,6 +3260,8 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
 
 '''
+    
+    lGenome = genomeArray.shape[0] #length of genome sequnce
     if nrSamples > lGenome:
         nrSamples = lGenome - 2*flankSize
         print("Nr of samples reduced to %d which equals the length of the interval from length of genome sequence less twice the flank size")
@@ -3116,6 +3274,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
     else:
         
         flankSizeOut = flankSize
+        
         
     #Set a labels-shape depending on the labelsCodetype:
     if labelsCodetype == 0:
@@ -3130,6 +3289,7 @@ def genSamplesForDynamicSampling_I(nrSamples,
         
         labelShape = 3
         
+
     if transformStyle_b == 0:
         
         if outputEncodedOneHot_b == 1:
@@ -3167,8 +3327,8 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
     #set a random seed bewteen 0 and 1e6:
 #    np.random.seed(seed = np.random.randint(0,1e6))
-
-    #NOT IN WORING ORDER!!
+    
+    #NOT IN WORING ORDER!?
     if fromGenome_b == 0:
         
         i = 0
@@ -3176,12 +3336,14 @@ def genSamplesForDynamicSampling_I(nrSamples,
             
             #generate random "letters", codeA, codeC, codeT, codeG
             for j in range(2*flankSize):
-                X[i][j] = np.random.randint(0,4) 
+                idx = np.random.randint(0,4) 
+                X[i][j][idx] = 1
                 
                 
             #generate random label:
             #NOT OK: should give a vector not an int
-            Y[i] = np.random.randint(0,labelShape)
+            idx = np.random.randint(0,labelShape) 
+            Y[i][idx] = 1
     
             #add reversed and complemented sequence: 
             if augmentWithRevComplementary_b == 1:
@@ -3217,142 +3379,166 @@ def genSamplesForDynamicSampling_I(nrSamples,
 
 
     elif fromGenome_b > 0.5:
-
         
         #sample from genomeSeq:
-        i = 0
         for i in range(nrSamples):
             
-            # Get random site unless we want to simply get the nrSamples samples from a running window of
-            # length 2*flankSize across the selected part of the genome:
-            # TODO? Redefine the selection of the random idx so that the batch is created from that point onwards to ensure coherence of the samples within a batch
-            if genRandomSamples_b == 0:
-                idx = flankSize + i
-            else:
-                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-
-            #If only repeat-positions are wanted:
-            if getOnlyRepeats_b == 1:
-                
-                while repeatArray[idx] == 0:
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
+            
+                #Get random site unless we want to simply get the nrSamples samples from a running window of
+                #length 2*flankSize across the selected part of the genome:
+                if genRandomSamples_b == 0:
+                    idx = flankSize + i
+                else:
+                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+    
+                #If only repeat-positions are wanted:
+                if getOnlyRepeats_b == 1:
                     
-                    if genRandomSamples_b == 0:
-                        idx += 1
+                    while repeatArray[idx] == 0:
+                        
+                        if genRandomSamples_b == 0:
+                            idx += 1
+                        else:
+                            idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+    
+                
+                if labelsCodetype == 0:
+                    Y[i] = genomeArray[idx]
+                elif labelsCodetype == 1:
+                    Y[i] = basePair(genomeArray[idx])
+                elif labelsCodetype == -1:
+                    Y[i] = basePairType(genomeArray[idx])
+                elif labelsCodetype == 2:
+                    if exonicArray[idx] == 1:
+                        Y[i] = exonicInd
+                    elif repeatArray[idx] == 1:
+                        Y[i] = repeatInd
                     else:
-                        idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-
-            
-            if labelsCodetype == 0:
-                if outputEncodedOneHot_b:
-                    Y[i] = oneHotLetter(genomeArray[idx])
-                else:
-                    Y[i] = intLetter(genomeArray[idx])
-            elif labelsCodetype == 1:
-                if outputEncodedOneHot_b:
-                    Y[i] = basePair(oneHotLetter(genomeArray[idx]))
-                else:
-                    Y[i] = basePair(intLetter(genomeArray[idx]))
-            elif labelsCodetype == -1:
-                if outputEncodedOneHot_b:
-                    Y[i] = basePairType(oneHotLetter(genomeArray[idx]))
-                else:
-                    Y[i] = basePairType(intLetter(genomeArray[idx]))
-            # WARNING!!!
-            # TODO: These cases are not currently handled
-            elif labelsCodetype == 2:
-                if exonicArray[idx] == 1:
-                    Y[i] = exonicInd
-                elif repeatArray[idx] == 1:
-                    Y[i] = repeatInd
-                else:
-                    Y[i] = otherInd
-            elif labelsCodetype == 3: #repeat or not?
-                if repeatArray[idx] == 1:
-                    Y[i] = repeatBinInd
-                else:
-                    Y[i] = notRepeatBinInd
-            
-#            print "idx:", idx
+                        Y[i] = otherInd
+                elif labelsCodetype == 3: #repeat or not?
+                    if repeatArray[idx] == 1:
+                        Y[i] = repeatBinInd
+                    else:
+                        Y[i] = notRepeatBinInd
+                
+    #            print "idx:", idx
+                        
+                
+                #... and fetch the correspondning flanks:
+                if inclFrqModel_b == 0:
+                    X[i][:flankSize] = genomeArray[(idx - flankSize):idx] #left-hand flank
+                    X[i][flankSize:] = genomeArray[(idx+1):(idx + 1 + flankSize)] #right-hand flank
                     
-            
-            #... and fetch the correspondning flanks:
-            if inclFrqModel_b == 0:
-                X[i][:flankSize] = [intLetter(x) for x in genomeArray[(idx - flankSize):idx]] #left-hand flank
-                X[i][flankSize:] = [intLetter(x) for x in genomeArray[(idx+1):(idx + 1 + flankSize)]] #right-hand flank
-            
-            if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
                 
-                genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
-                if len(genString) != 2*flankSizeFrqModel:
-                    print("Something's rotten, lgth of genString is: ", len(genString) )
-                try:
-                    X[i][flankSizeOut] = frqModelDict[genString]
-                except KeyError:
-                    prin( "KeyError when reading from frqModelDict, key: ", genString)
-                    X[i][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
-                
-                X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
-                X[i][(flankSizeOut+1):] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
-                
-            
-            if shuffle_b > 0.5:
-#                print "I shuffle ..."
-#            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-                else:
-                    shuffle(X[i])          
-            
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-                
-                if outputEncodedOneHot_b == 1:
+                if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
                     
-                    if inclFrqModel_b == 0:
-                        xRev = X[i][::-1]
-                        xRevAug = map(complementArray, xRev)
-                        X[i + nrSamples] = xRevAug
-                        if labelsCodetype == 0:
-                            Y[i + nrSamples ] = complementArray(Y[i])
-                        elif labelsCodetype == 1:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == -1:
-                            Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-                        elif labelsCodetype == 2:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == 3:
-                            Y[i + nrSamples ] = Y[i]
+                    genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
+                    if len(genString) != 2*flankSizeFrqModel:
+                        print("Something's rotten, lgth of genString is: ", len(genString) )
+                    
+                    X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
+                    X[i][(flankSizeOut+1):] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
+                    
+                    
+                    
+                #In case we are sampling randomly and the sample contains a not-ACGT it must be discarded;
+                #if we are "sampling" a stretch of the genome, we keep all samples --- so when using the output sample
+                #the non-qualified letters/positions must be discarded there:  
+                if genRandomSamples_b > 0:
+                    
+                    if np.max(X[i]) > 2 or np.max(Y[i]) > 2:
+                        continue
+                    else:
+                        noQualifiedSampleObtainedYet_b = 1
+                        
+                        
+                #if we want to include the output from a frq-model (k-mer model) in our model, we place the input of the frq-model at the center of X (ie at flankSizeOut):
+                if inclFrqModel_b == 1 and outputEncodedOneHot_b == 1:
+                    
+                    #before 21 Aug 2019:
+    #                try:
+    #                    X[i][flankSizeOut] = frqModelDict[genString]
+    #                except KeyError:
+    #                    prin( "KeyError when reading from frqModelDict, key: ", genString)
+    #                    X[i][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
+                    #After 21 Aug 2019:
+                    #we fetched genString above
+                    try:
+                        X[i][flankSizeOut] = np.log(frqModelDict[genString]) - np.log([0.25, 0.25, 0.25, 0.25]) #reason for centering: get both neg and pos numbers
+                    except KeyError:
+                        print( "KeyError when reading from frqModelDict, key: ", genString)
+                        X[i][flankSizeOut] = np.array([0.0, 0.0, 0.0, 0.0]) #np.log([0.25, 0.25, 0.25, 0.25]) #np.array([0.0, 0.0, 0.0, 0.0])
+                
+                
+                    
+                
+                if shuffle_b > 0.5:
+    #                print "I shuffle ..."
+    #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])          
+                
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                    
+                    if outputEncodedOneHot_b == 1:
+                        
+                        if inclFrqModel_b == 0:
+                            xRev = X[i][::-1]
+                            xRevAug = map(complementArray, xRev)
+                            X[i + nrSamples] = xRevAug
+                            if labelsCodetype == 0:
+                                Y[i + nrSamples ] = complementArray(Y[i])
+                            elif labelsCodetype == 1:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == -1:
+                                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+                            elif labelsCodetype == 2:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == 3:
+                                Y[i + nrSamples ] = Y[i]
+                                
+                        if inclFrqModel_b == 1:
                             
-                    if inclFrqModel_b == 1:
-                        
-                        revComplGenString = ''.join(map(complementLetter,genString))
-                        try:
-                            X[i + nrSamples][flankSizeOut] = frqModelDict[revComplGenString]
-                        except KeyError:
-                            X[i + nrSamples][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
+                            revComplGenString = ''.join(map(complementLetter,genString))
+                            #before 21 Aug 2019:
+    #                        try:
+    #                            X[i + nrSamples][flankSizeOut] = frqModelDict[revComplGenString]
+    #                        except KeyError:
+    #                            X[i + nrSamples][flankSizeOut] = [0.25, 0.25, 0.25, 0.25]
+                            #After 21 Aug 2019:
+                            try:
+                                X[i + nrSamples][flankSizeOut] = np.log(frqModelDict[revComplGenString])
+                            except KeyError:
+                                X[i + nrSamples][flankSizeOut] = np.log([0.25, 0.25, 0.25, 0.25])
+                            
+                    
+                            
+                            X[i + nrSamples][:flankSizeOut] = map(complementArray, X[i + nrSamples][(flankSizeOut+1):])
+                            X[i + nrSamples][(flankSizeOut+1):] =  map(complementArray, X[i + nrSamples][:flankSizeOut])
+                            if labelsCodetype == 0:
+                                Y[i + nrSamples ] = complementArray(Y[i])
+                            elif labelsCodetype == 1:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == -1:
+                                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+                            elif labelsCodetype == 2:
+                                Y[i + nrSamples ] = Y[i]
+                            elif labelsCodetype == 3:
+                                Y[i + nrSamples ] = Y[i]
+                    
+                    elif outputEncodedInt_b == 1:
+                        xRev = X[i][::-1]
+                        xRevAug = map(complementInt, xRev)
+                        X[i + nrSamples] = xRevAug
+                        Y[i + nrSamples ] = complementInt(Y[i])
                 
-                        
-                        X[i + nrSamples][:flankSizeOut] = map(complementArray, X[i + nrSamples][(flankSizeOut+1):])
-                        X[i + nrSamples][(flankSizeOut+1):] =  map(complementArray, X[i + nrSamples][:flankSizeOut])
-                        if labelsCodetype == 0:
-                            Y[i + nrSamples ] = complementArray(Y[i])
-                        elif labelsCodetype == 1:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == -1:
-                            Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-                        elif labelsCodetype == 2:
-                            Y[i + nrSamples ] = Y[i]
-                        elif labelsCodetype == 3:
-                            Y[i + nrSamples ] = Y[i]
-                
-                elif outputEncodedInt_b == 1:
-                    xRev = X[i][::-1]
-                    xRevAug = map(complementInt, xRev)
-                    X[i + nrSamples] = xRevAug
-                    Y[i + nrSamples ] = complementInt(Y[i])
-            
             
     if outputEncodedOneHot_b == 1 and convertToPict_b == 1:
         
@@ -3461,75 +3647,87 @@ def genSamplesForDynamicSampling_II(nrSamples,
 
         
         #sample from genomeSeq:
-        i = 0
         for i in range(nrSamples):
             
-            #Get random site unless we want to simply get the nrSamples samples from a running window of
-            #length 2*flankSize across the selected part of the genome:
-            if genRandomSamples_b == 0:
-                idx = flankSize + i
-            else:
-                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
             
-            label = genomeArray[idx]
-#            print "idx:", idx
-            
-                            
-            genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
-            if len(genString) != 2*flankSizeFrqModel:
-                print("Something's rotten, lgth of genString is: ", len(genString) )
-            try:
-                predIdx = np.argmax(frqModelDict[genString])
-            except KeyError:
-                print("KeyError when reading from frqModelDict, key: ", genString)
-                predIdx = np.random.randint(4)
-            
-            X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
-            X[i][flankSizeOut:] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
-            
-            #the output we want records if the frqModel's bid differs from the actual label or not;
-            #either we just store this crude info (as a 1 or 0, resp.), or we store the actual dinucleo
-            #but one-hot it (in which case the labelSize must be 16):
-            if labelSize == 2:
-                
-                if np.max(label - alphabetOnehot[predIdx]) == 0:
-                    Y[i] = np.array([1,0])
+                #Get random site unless we want to simply get the nrSamples samples from a running window of
+                #length 2*flankSize across the selected part of the genome:
+                if genRandomSamples_b == 0:
+                    idx = flankSize + i
                 else:
-                    Y[i] = np.array([0,1])
+                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
                 
-            elif labelSize == 16:
+                label = genomeArray[idx]
+    #            print "idx:", idx
                 
-                #the labels record the true letter (e.g A) followed by the frq-model's prediction (e.g.T), so
-                #a dinucleotide (here AT)
-                #generate a one-hot encoding for these dinucleos: 
-                #the label will be a 16 long array of zeros except a 1 at one place;
-                #AA will be [1,0,...], AC [0,1,0,...] ...
-                #CA will be [0,0,0,0,1,0,...], CC [0,0,0,0,0,1,0,...]
-                #etc:
-                n1 = np.argmax(label)
-                nonZeroIdx = 4*n1 + predIdx
-                Y[i][nonZeroIdx] = 1
+                                
+                genString = genomeString[(idx - flankSizeFrqModel):idx] + genomeString[(idx + 1):(idx + 1 + flankSizeFrqModel)]
+                if len(genString) != 2*flankSizeFrqModel:
+                    print("Something's rotten, lgth of genString is: ", len(genString) )
+                try:
+                    predIdx = np.argmax(frqModelDict[genString])
+                except KeyError:
+                    print("KeyError when reading from frqModelDict, key: ", genString)
+                    predIdx = np.random.randint(4)
                 
-            else:
-                print("Fatal error: label size must be either 2 or 16")
-                return
-        
-        if shuffle_b > 0.5:
-#                print "I shuffle ..."
-#            print v2
-            if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-            elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
-            else:
-                shuffle(X[i])          
-        
-        #add reversed and complemented sequence: 
-        if augmentWithRevComplementary_b == 1:
+                X[i][:flankSizeOut] = genomeArray[(idx - flankSize):(idx - exclFrqModelFlanks_b*flankSizeFrqModel)] #left-hand flank
+                X[i][flankSizeOut:] = genomeArray[(idx+exclFrqModelFlanks_b*flankSizeFrqModel+1):(idx + 1 + flankSize)] #right-hand flank
+                
+                #In case we are smapling randomly and the sample contains a not-ACGT it must be discarded;
+                #if we are "sampling" a stretch of the genome, we keep all samples --- so when using the output sample
+                #the non-qulified letters/positions must be discarded there:  
+                if genRandomSamples_b > 0:
+                    
+                    if np.max(X[i]) > 2 or np.max(label) > 2:
+                        continue
+                    else:
+                        noQualifiedSampleObtainedYet_b = 1
+                
+                #the output we want records if the frqModel's bid differs from the actual label or not;
+                #either we just store this crude info (as a 1 or 0, resp.), or we store the actual dinucleo
+                #but one-hot it (in which case the labelSize must be 16):
+                if labelSize == 2:
+                    
+                    if np.max(label - alphabetOnehot[predIdx]) == 0:
+                        Y[i] = np.array([1,0])
+                    else:
+                        Y[i] = np.array([0,1])
+                    
+                elif labelSize == 16:
+                    
+                    #the labels record the true letter (e.g A) followed by the frq-model's prediction (e.g.T), so
+                    #a dinucleotide (here AT)
+                    #generate a one-hot encoding for these dinucleos: 
+                    #the label will be a 16 long array of zeros except a 1 at one place;
+                    #AA will be [1,0,...], AC [0,1,0,...] ...
+                    #CA will be [0,0,0,0,1,0,...], CC [0,0,0,0,0,1,0,...]
+                    #etc:
+                    n1 = np.argmax(label)
+                    nonZeroIdx = 4*n1 + predIdx
+                    Y[i][nonZeroIdx] = 1
+                    
+                else:
+                    print("Fatal error: label size must be either 2 or 16")
+                    return
             
-            print("Fatal error: augmentWithRevComplementary_b is not in working order here!")
-            return 
-        
+            if shuffle_b > 0.5:
+    #                print "I shuffle ..."
+    #            print v2
+                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                    shuffleFlanks(v = X[i], flankSize = flankSizeOut, shuffleLength = shuffleLength, inner_b = inner_b)
+                else:
+                    shuffle(X[i])          
+            
+            #add reversed and complemented sequence: 
+            if augmentWithRevComplementary_b == 1:
+                
+                print("Fatal error: augmentWithRevComplementary_b is not in working order here!")
+                return 
+            
             
     if convertToPict_b == 1:
         
@@ -3667,86 +3865,96 @@ def genSamplesDirectlyFromGenome(genomeString,
         print("length of genome string:", lGenome)
     
         #sample from genomeSeq:
-        i = 0
         for i in range(nrSamples):
             
-            #Get random site 
-            idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-    
-            #If only repeat-positions are wanted:
-            if getOnlyRepeats_b == 1:
-                
-                while repeatArray[idx] == 0:
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
+            
+                #Get random site 
+                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+        
+        
+                #If only repeat-positions are wanted:
+                if getOnlyRepeats_b == 1:
                     
-                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-                
-            if labelsCodetype == 0:
-                Y.append(genomeString[idx])
-    #        elif labelsCodetype == 1:
-    #            Y[i] = basePair(genomeArray[idx])
-    #        elif labelsCodetype == -1:
-    #            Y[i] = basePairType(genomeArray[idx])
-    #        elif labelsCodetype == 2:
-    #            if exonicArray[idx] == 1:
-    #                Y[i] = exonicInd
-    #            elif repeatArray[idx] == 1:
-    #                Y[i] = repeatInd
-    #            else:
-    #                Y[i] = otherInd
-    #        elif labelsCodetype == 3: #repeat or not?
-    #            if repeatArray[idx] == 1:
-    #                Y[i] = repeatBinInd
-    #            else:
-    #                Y[i] = notRepeatBinInd
-                
-    #            print "idx:", idx
+                    while repeatArray[idx] == 0:
                         
-                
-            #... and fetch the correspondning flanks:
-            X.append(genomeString[(idx - flankSize):idx] + genomeString[(idx+1):(idx + 1 + flankSize)]) #left-hand flank + right-hand flank
-            
-               
-            
-            if shuffle_b > 0.5:
-    #                print "I shuffle ..."
-    #            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                        idx = np.random.randint(flankSize+1,lGenome-flankSize)
+                        
+                #In case the sample contains a not-ACGT it must be discarded;
+                genString = genomeString[(idx - flankSize):(idx + 1 + flankSize)]
+                if genString.count('W') > 0:
+                    continue
                 else:
-                    shuffle(X[i])     
+                    noQualifiedSampleObtainedYet_b = 1
+                        
                     
-                
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-            
-                xRev = X[i][::-1]
-                xRevAug = ''.join(map(complementLetter, xRev)) #join the letters .. to form a string 
-                Xrev.append(xRevAug)
+                    
                 if labelsCodetype == 0:
-                    Yrev.append(complementLetter(Y[i]))
-    #            elif labelsCodetype == 1:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == -1:
-    #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-    #            elif labelsCodetype == 2:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == 3:
-    #                Y[i + nrSamples ] = Y[i]
-    
-                if shuffle_b > 0.5:
-    #                print "I shuffle ..."
-    #            print v2
-                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                        shuffleFlanks(v = Xrev[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                        shuffleFlanks(v = Xrev[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                    else:
-                        shuffle(Xrev[i]) 
+                    Y.append(genomeString[idx])
+        #        elif labelsCodetype == 1:
+        #            Y[i] = basePair(genomeArray[idx])
+        #        elif labelsCodetype == -1:
+        #            Y[i] = basePairType(genomeArray[idx])
+        #        elif labelsCodetype == 2:
+        #            if exonicArray[idx] == 1:
+        #                Y[i] = exonicInd
+        #            elif repeatArray[idx] == 1:
+        #                Y[i] = repeatInd
+        #            else:
+        #                Y[i] = otherInd
+        #        elif labelsCodetype == 3: #repeat or not?
+        #            if repeatArray[idx] == 1:
+        #                Y[i] = repeatBinInd
+        #            else:
+        #                Y[i] = notRepeatBinInd
                     
+        #            print "idx:", idx
+                            
+                    
+                #... and fetch the correspondning flanks:
+                X.append(genomeString[(idx - flankSize):idx] + genomeString[(idx+1):(idx + 1 + flankSize)]) #left-hand flank + right-hand flank
+                
+                   
+                
+                if shuffle_b > 0.5:
+        #                print "I shuffle ..."
+        #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])     
+                        
+                    
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                
+                    xRev = X[i][::-1]
+                    xRevAug = ''.join(map(complementLetter, xRev)) #join the letters .. to form a string 
+                    Xrev.append(xRevAug)
+                    if labelsCodetype == 0:
+                        Yrev.append(complementLetter(Y[i]))
+        #            elif labelsCodetype == 1:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == -1:
+        #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+        #            elif labelsCodetype == 2:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == 3:
+        #                Y[i + nrSamples ] = Y[i]
+        
+                    if shuffle_b > 0.5:
+        #                print "I shuffle ..."
+        #            print v2
+                        if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                            shuffleFlanks(v = Xrev[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                        elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                            shuffleFlanks(v = Xrev[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                        else:
+                            shuffle(Xrev[i]) 
+                        
                
     #    if transformStyle_b == 0: 
         
@@ -3763,80 +3971,88 @@ def genSamplesDirectlyFromGenome(genomeString,
         print("length of genome string:", lGenome)
     
         #sample from genomeSeq:
-        i = 0
         for i in range(nrSamples):
             
-            #Get random site 
-            idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-    
-            #If only repeat-positions are wanted:
-            if getOnlyRepeats_b == 1:
-                
-                while repeatArray[idx] == 0:
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
+            
+                #Get random site 
+                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+        
+        
+                #If only repeat-positions are wanted:
+                if getOnlyRepeats_b == 1:
                     
-                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-                
-            if labelsCodetype == 0:
-                Y[i] = oneHotLetter(genomeString[idx])
-    #        elif labelsCodetype == 1:
-    #            Y[i] = basePair(genomeArray[idx])
-    #        elif labelsCodetype == -1:
-    #            Y[i] = basePairType(genomeArray[idx])
-    #        elif labelsCodetype == 2:
-    #            if exonicArray[idx] == 1:
-    #                Y[i] = exonicInd
-    #            elif repeatArray[idx] == 1:
-    #                Y[i] = repeatInd
-    #            else:
-    #                Y[i] = otherInd
-    #        elif labelsCodetype == 3: #repeat or not?
-    #            if repeatArray[idx] == 1:
-    #                Y[i] = repeatBinInd
-    #            else:
-    #                Y[i] = notRepeatBinInd
-                
-    #            print "idx:", idx
+                    while repeatArray[idx] == 0:
                         
-                
-            #... and fetch the correspondning flanks:
-            X[i][:flankSize] = np.asarray(list(map(oneHotLetter, genomeString[(idx - flankSize):idx]))) #left-hand flank
-            X[i][flankSize:] = np.asarray(list(map(oneHotLetter, genomeString[(idx+1):(idx + 1 + flankSize)]))) #right-hand flank
-            
-               
-            
-            if shuffle_b > 0.5:
-    #                print "I shuffle ..."
-    #            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                else:
-                    shuffle(X[i])     
+                        idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+        
                     
-                
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-            
-                xRev = X[i][::-1]
-                xRevAug = np.asarray(list(map(complementArray, xRev)))
-                X[i + nrSamples] = xRevAug
                 if labelsCodetype == 0:
-                    Y[i + nrSamples ] = complementArray(Y[i])
-    #            elif labelsCodetype == 1:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == -1:
-    #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-    #            elif labelsCodetype == 2:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == 3:
-    #                Y[i + nrSamples ] = Y[i]
+                    Y[i] = oneHotLetter(genomeString[idx])
+        #        elif labelsCodetype == 1:
+        #            Y[i] = basePair(genomeArray[idx])
+        #        elif labelsCodetype == -1:
+        #            Y[i] = basePairType(genomeArray[idx])
+        #        elif labelsCodetype == 2:
+        #            if exonicArray[idx] == 1:
+        #                Y[i] = exonicInd
+        #            elif repeatArray[idx] == 1:
+        #                Y[i] = repeatInd
+        #            else:
+        #                Y[i] = otherInd
+        #        elif labelsCodetype == 3: #repeat or not?
+        #            if repeatArray[idx] == 1:
+        #                Y[i] = repeatBinInd
+        #            else:
+        #                Y[i] = notRepeatBinInd
                     
-               
-    #    if transformStyle_b == 0:  
-
+        #            print "idx:", idx
+                            
+                    
+                #... and fetch the correspondning flanks:
+                X[i][:flankSize] = np.asarray(list(map(oneHotLetter, genomeString[(idx - flankSize):idx]))) #left-hand flank
+                X[i][flankSize:] = np.asarray(list(map(oneHotLetter, genomeString[(idx+1):(idx + 1 + flankSize)]))) #right-hand flank
+                
+                   
+                #In case  the sample contains a not-ACGT it must be discarded (and we must fetch a new one);  
+                if np.max(X[i]) > 2 or np.max(Y[i]) > 2:
+                    continue
+                else:
+                    noQualifiedSampleObtainedYet_b = 1
+                    
+                
+                if shuffle_b > 0.5:
+        #                print "I shuffle ..."
+        #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])     
+                        
+                    
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                
+                    xRev = X[i][::-1]
+                    xRevAug = np.asarray(list(map(complementArray, xRev)))
+                    X[i + nrSamples] = xRevAug
+                    if labelsCodetype == 0:
+                        Y[i + nrSamples ] = complementArray(Y[i])
+        #            elif labelsCodetype == 1:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == -1:
+        #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+        #            elif labelsCodetype == 2:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == 3:
+        #                Y[i + nrSamples ] = Y[i]
+                        
+                   
+        #    if transformStyle_b == 0:  
+    
 
          
     
@@ -3847,77 +4063,85 @@ def genSamplesDirectlyFromGenome(genomeString,
         print("length of genome string:", lGenome)
     
         #sample from genomeSeq:
-        i = 0
         for i in range(nrSamples):
             
-            #Get random site 
-            idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-    
-            #If only repeat-positions are wanted:
-            if getOnlyRepeats_b == 1:
-                
-                while repeatArray[idx] == 0:
+            noQualifiedSampleObtainedYet_b = 0
+            while noQualifiedSampleObtainedYet_b == 0:
+            
+                #Get random site 
+                idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+        
+        
+                #If only repeat-positions are wanted:
+                if getOnlyRepeats_b == 1:
                     
-                    idx = np.random.randint(flankSize+1,lGenome-flankSize) 
-    
-                
-            if labelsCodetype == 0:
-                Y[i] = intLetter(genomeString[idx])
-    #        elif labelsCodetype == 1:
-    #            Y[i] = basePair(genomeArray[idx])
-    #        elif labelsCodetype == -1:
-    #            Y[i] = basePairType(genomeArray[idx])
-    #        elif labelsCodetype == 2:
-    #            if exonicArray[idx] == 1:
-    #                Y[i] = exonicInd
-    #            elif repeatArray[idx] == 1:
-    #                Y[i] = repeatInd
-    #            else:
-    #                Y[i] = otherInd
-    #        elif labelsCodetype == 3: #repeat or not?
-    #            if repeatArray[idx] == 1:
-    #                Y[i] = repeatBinInd
-    #            else:
-    #                Y[i] = notRepeatBinInd
-                
-    #            print "idx:", idx
+                    while repeatArray[idx] == 0:
                         
-                
-            #... and fetch the correspondning flanks:
-            X[i][:flankSize] = np.asarray(list(map(intLetter, genomeString[(idx - flankSize):idx]))) #left-hand flank
-            X[i][flankSize:] = np.asarray(list(map(intLetter, genomeString[(idx+1):(idx + 1 + flankSize)]))) #right-hand flank
-            
-               
-            
-            if shuffle_b > 0.5:
-    #                print "I shuffle ..."
-    #            print v2
-                if inner_b == 0: #shuffle only the 2*shuffleLength long central part
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
-                    shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
-                else:
-                    shuffle(X[i])     
+                        idx = np.random.randint(flankSize+1,lGenome-flankSize) 
+        
                     
-                
-            #add reversed and complemented sequence: 
-            if augmentWithRevComplementary_b == 1:
-            
-                xRev = X[i][::-1]
-                xRevAug = np.asarray(list(map(complementInt, xRev)))
-                X[i + nrSamples] = xRevAug
                 if labelsCodetype == 0:
-                    Y[i + nrSamples ] = complementInt(Y[i])
-    #            elif labelsCodetype == 1:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == -1:
-    #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
-    #            elif labelsCodetype == 2:
-    #                Y[i + nrSamples ] = Y[i]
-    #            elif labelsCodetype == 3:
-    #                Y[i + nrSamples ] = Y[i]
+                    Y[i] = intLetter(genomeString[idx])
+        #        elif labelsCodetype == 1:
+        #            Y[i] = basePair(genomeArray[idx])
+        #        elif labelsCodetype == -1:
+        #            Y[i] = basePairType(genomeArray[idx])
+        #        elif labelsCodetype == 2:
+        #            if exonicArray[idx] == 1:
+        #                Y[i] = exonicInd
+        #            elif repeatArray[idx] == 1:
+        #                Y[i] = repeatInd
+        #            else:
+        #                Y[i] = otherInd
+        #        elif labelsCodetype == 3: #repeat or not?
+        #            if repeatArray[idx] == 1:
+        #                Y[i] = repeatBinInd
+        #            else:
+        #                Y[i] = notRepeatBinInd
                     
+        #            print "idx:", idx
+                            
+                    
+                #... and fetch the correspondning flanks:
+                X[i][:flankSize] = np.asarray(list(map(intLetter, genomeString[(idx - flankSize):idx]))) #left-hand flank
+                X[i][flankSize:] = np.asarray(list(map(intLetter, genomeString[(idx+1):(idx + 1 + flankSize)]))) #right-hand flank
+                
+                
+                #In case  the sample contains a not-ACGT it must be discarded (and we must fetch a new one);  
+                if np.max(X[i]) > 2 or np.max(Y[i]) > 2:
+                    continue
+                else:
+                    noQualifiedSampleObtainedYet_b = 1
+    
+                
+                if shuffle_b > 0.5:
+        #                print "I shuffle ..."
+        #            print v2
+                    if inner_b == 0: #shuffle only the 2*shuffleLength long central part
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    elif inner_b == 1:#shuffle only the outer left and right shuffleLength long outer parts
+                        shuffleFlanks(v = X[i], flankSize = flankSize, shuffleLength = shuffleLength, inner_b = inner_b)
+                    else:
+                        shuffle(X[i])     
+                        
+                    
+                #add reversed and complemented sequence: 
+                if augmentWithRevComplementary_b == 1:
+                
+                    xRev = X[i][::-1]
+                    xRevAug = np.asarray(list(map(complementInt, xRev)))
+                    X[i + nrSamples] = xRevAug
+                    if labelsCodetype == 0:
+                        Y[i + nrSamples ] = complementInt(Y[i])
+        #            elif labelsCodetype == 1:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == -1:
+        #                Y[i + nrSamples ] = complementArrayBasepairType(Y[i])
+        #            elif labelsCodetype == 2:
+        #                Y[i + nrSamples ] = Y[i]
+        #            elif labelsCodetype == 3:
+        #                Y[i + nrSamples ] = Y[i]
+                        
                
     #    if transformStyle_b == 0:  
         

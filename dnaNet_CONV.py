@@ -148,6 +148,104 @@ dnaNet.allInOneWithDynSampling_ConvModel_I(nrOuterLoops = nrOuterLoops, firstIte
 
    
 
+####################################################
+
+#Merging a model merged with a k-mer model and training the combo:
+
+####################################################
+
+#Pre-req's on input data and param's as above:
+
+#for short test run (eg to see how long training takes)
+nrOuterLoops = 2
+nrOfRepeats = 2
+testDataIntervalIdTotrainDataInterval_b = 0
+nrEpochs = 10
+batchSize = 500
+stepsPerEpoch = 100
+trainDataIntervalStepSize = 5000000
+trainDataInterval = [1000000,20000000]
+nrTestSamples = 1000000 
+testDataInterval = [10000000,15000000]
+
+
+#In anger:
+nrOuterLoops = 1
+nrOfRepeats = 100
+testDataIntervalIdTotrainDataInterval_b = 1
+nrEpochs = 100
+batchSize = 500
+stepsPerEpoch = 100
+trainDataIntervalStepSize = 0
+trainDataInterval = [0,3000000000]
+nrTestSamples = 1000000
+testDataInterval = [0,0]
+
+
+#A small test model. OBS: THE NAME REVEALS THAT FRQ MODEL IS INCLUDED
+learningRate = 0.001
+pool_b = 0
+poolAt = [1, 3]
+maxPooling_b = 0
+poolStrides = 1
+lengthWindows = [3, 3]
+nrFilters = [64, 64] 
+padding = 'valid'
+#Final dense layers:
+hiddenUnits = [50] 
+onlyOneRandomChromo_b = 0
+avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22'] 
+on_binf_b = 1
+str = '2LayersFlat3_1Dense50_learningRate001_padValid_noPool_inclFrq_test'
+modelName = 'ownSamples/human/inclRepeats/Conv1d_' + str + '_50_units1Hidden'  
+modelDescr = str+'_50_units1Hidden'
+
+
+#The larger model. OBS: THE NAME REVEALS THAT FRQ MODEL IS INCLUDED
+learningRate = 0.001
+pool_b = 0
+poolAt = [1, 3]
+maxPooling_b = 0
+poolStrides = 1
+lengthWindows = [3, 3,  6, 6]
+nrFilters = [64, 64, 96, 96] 
+padding = 'valid'
+sizeOutput=4
+#final dense layers:
+hiddenUnits = [100,50]
+onlyOneRandomChromo_b = 0
+#??
+avoidChromo = ['chrX', 'chrY', 'chrM', 'chr15', 'chr22'] 
+on_binf_b = 1
+str = '4LayersRising3To6_2Dense100_50_learningRate001_padValid_noPool'
+modelName = 'ownSamples/human/inclRepeats/Conv1d_' + str + '_50_units1Hidden'  
+modelDescr = str+'_50_units1Hidden'
+
+
+#Ex/Including results from frq model:
+dynSamplesTransformStyle_b = 0
+inclFrqModel_b = 0
+insertFrqModel_b = 0
+rootFrq = '/isdata/kroghgrp/tkj375/various_python/DNA_proj/results_frqModels/human/firstRun/'
+file = "frqModel_chr10_k4.txt"
+#file = "frqModel_chr10_k5.txt"
+frqModelFileName = rootFrq + file
+flankSizeFrqModel = 4
+exclFrqModelFlanks_b = 0
+augmentWithRevComplementary_b = 0
+dropoutVal = 0.0 #corr's to 1 unit
+dropoutLastLayer_b = 1
+pool_b = pool_b
+maxPooling_b = maxPooling_b
+optimizer = 'ADAM'
+momentum = 0.1 #default, but we use Adam here, so the value here isn't used
+learningRate = learningRate
+
+#Run training/testing:
+dnaNet.allInOneWithDynSampling_ConvModel_I(nrOuterLoops = nrOuterLoops, firstIterNr = 0, nrOfRepeats = nrOfRepeats, firstRepeatNr = 0, testDataIntervalIdTotrainDataInterval_b = testDataIntervalIdTotrainDataInterval_b, dynSamplesTransformStyle_b = dynSamplesTransformStyle_b, learningRate = learningRate, momentum = momentum,  modelIs1D_b = 1, genomeFileName = fileGenome, inclFrqModel_b = inclFrqModel_b, insertFrqModel_b = insertFrqModel_b, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelFileName = frqModelFileName, flankSizeFrqModel = flankSizeFrqModel, modelName = modelName, trainDataIntervalStepSize = trainDataIntervalStepSize, trainDataInterval0 = trainDataInterval , nrTestSamples = nrTestSamples, testDataInterval0 = testDataInterval, genSamplesFromRandomGenome_b = 0,  genSamples_b = 1,  lengthWindows = lengthWindows, hiddenUnits = hiddenUnits, nrFilters = nrFilters,  padding = padding, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, poolStrides = poolStrides, dropoutVal = dropoutVal, dropoutLastLayer_b = dropoutLastLayer_b, augmentWithRevComplementary_b = augmentWithRevComplementary_b, batchSize = batchSize, nrEpochs = nrEpochs, stepsPerEpoch = stepsPerEpoch, shuffle_b = 0, on_binf_b = on_binf_b) 
+
+
+
 '''
 
 
@@ -202,16 +300,16 @@ import matplotlib.pyplot as plt
 
 from random import shuffle
 
-import frqModels as frqM
-
 import cPickle as pickle
 
 #import graphviz
 #import pydot
 
 
+import frqModels as frqM 
 
-from dnaNet_dataGen import * #all smpling aso is here
+
+import dnaNet_dataGen as dataGen #all smpling aso is here
 
 
 ############################## 
@@ -328,16 +426,17 @@ def makeConv1DmodelMergedWithFrqModel(frqModelOutputSize,
                     dropoutLastLayer_b = 0,
                     mergeFrqAndConvInLastDense_b = 0):
     '''
-    Builds 1D convolutional network model merged with the freqeuncy model; the input is divided in a 
-    sequenece for the convolutional part and the output from the frq model; the two are input to the
-    dense layer following the conv model:
+    Builds 1D convolutional network model merged with the frequency model; the input is divided in a 
+    sequenece for the convolutional part and the output from the frq model; the output from the convo part
+    and that from the frq model are input to one of the the dense layers following the conv model (either the final or
+    the next-to-final):
     
     orig input 
     
-    --> 1) two flanks of size flankSize - flankSizeFrqModel goes two conv layers
-    --> 2) midle two flanks of size flankSizeFrqModel goes to frq model
+    --> 1) two flanks of size flankSize - exclFrqModelFlanks_b*flankSizeFrqModel goes to conv layers
+    --> 2) middle two flanks of size flankSizeFrqModel goes to frq model, which then outputs a distr over the four letters, ie shape (1,letterShape)
     
-    The output from 1 and 2 are merged in the (first) dense layer. So in effect the input's middle word
+    The output from 1 and 2 are merged in the (first or last) dense layer. So in effect the input's middle word
     (skipping the central letter) of length 2*flankSizeFrqModel are skipping the conv layers and instead
     handled by the frq model.
     
@@ -405,7 +504,7 @@ def makeConv1DmodelMergedWithFrqModel(frqModelOutputSize,
 
     if mergeFrqAndConvInLastDense_b == 1:
         
-        #for the last NN layer: merge with frq model output with the output from the conv+NN-layers:
+        #for the last NN layer: merge frq model output with the output from the conv+NN-layers:
     #    pool = Reshape((pool._keras_shape[1]*pool._keras_shape[2],))(pool)
     #    print(reshapedPool._keras_shape)    
         reshapedInputsFrqModel = Reshape((-1,))(inputsFrqModel)
@@ -432,7 +531,7 @@ def makeConv1DmodelMergedWithFrqModel(frqModelOutputSize,
 
     if mergeFrqAndConvInLastDense_b != 1:
         
-        #for the final decision layer: merge with frq model output with the output from the conv+NN-layers:
+        #for the final decision layer: merge frq model output with the output from the conv+NN-layers:
     #    pool = Reshape((pool._keras_shape[1]*pool._keras_shape[2],))(pool)
     #    print(reshapedPool._keras_shape)    
         reshapedInputsFrqModel = Reshape((-1,))(inputsFrqModel)
@@ -586,40 +685,7 @@ def allInOne_ConvModel(bigLoopsNr = 1,
         rootOutput = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/results_nets/"
 
 
-            
-#1st version parameters:    
-#    lengthWindows = 5, 7, 10, 15, 20, 25
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 30, 20, 10
-    
-#2nd version parameter:
-#    lengthWindows = 3, 5, 7
-#    nrHiddenUnits = 25
-#    nrFilters = 25, 15, 10
-      
-##3rd version parameter:
-#    lengthWindows = 3, 3
-#    nrHiddenUnits = 25
-#    nrFilters = 10, 5
-     
-#    lengthWindows = 3, 3, 4, 6, 8, 10, 15, 20, 30
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 45, 40, 30, 25, 20, 15
-     
-     
-    
-    #Using the getData-fct to fetch data:
-#    fname=root + r"trShort.dat"
-#    tname=root + r"tsShort.dat"
-#    vname=root + r"vlShort.dat"
-#      
-#    X,Y = dnaNet.getData2(fname, letterShape, sizeOutput, outputType=float)  
-#    sizeInputput = X.shape[1] 
-#        
-#    Xt,Yt = dnaNet.getData2(tname, letterShape, sizeOutput , outputType=float)  
-#    
-#   
-    
+
     modelFileName = rootOutput + modelName
     
     for i in range(startFrom, bigLoopsNr):
@@ -644,29 +710,29 @@ def allInOne_ConvModel(bigLoopsNr = 1,
             else:
                 fromGenome_b = 0
           
-            X,Y, genomeSeqSourceTrain = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTrainSamples, startAtPosition = trainDataInterval[0], endAtPosition = trainDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            X,Y, genomeSeqSourceTrain = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTrainSamples, startAtPosition = trainDataInterval[0], endAtPosition = trainDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
             sizeInput = X.shape[1]
             print("Train data shape", X.shape)
     
             avoidChromo.append(genomeSeqSourceTrain) #to avoid getting val data from the same chromo as the training data 
-            Xv,Yv, genomeSeqSourceVal = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrValSamples, startAtPosition = valDataInterval[0], endAtPosition = valDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            Xv,Yv, genomeSeqSourceVal = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrValSamples, startAtPosition = valDataInterval[0], endAtPosition = valDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
             print("Val data shape", Xv.shape)
             
             avoidChromo.append(genomeSeqSourceVal) ##to avoid getting test data from the same chromo as the training and validation data 
-            Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  convertToPict_b = convertToPict_b,  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
             print("Test data shape", Xt.shape)
     
         elif genSamplesFromRandomGenome_b > 0.5: #generate a set of random data acc to the sizes set
     
             #generate random genome of set size:   
-            genRandomGenome(length = randomGenomeSize, fileName = root + randomGenomeFileName, on_binf_b = on_binf_b) #will write the generated genome sequence to the file  
+            dataGen.genRandomGenome(length = randomGenomeSize, fileName = root + randomGenomeFileName, on_binf_b = on_binf_b) #will write the generated genome sequence to the file  
     
-            X,Y = genSamples_I(nrSamples = trainDataInterval[1] - trainDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            X,Y = dataGen.genSamples_I(nrSamples = trainDataInterval[1] - trainDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
             sizeInput = X.shape[1]
     
-            Xv,Yv = genSamples_I(nrSamples = valDataInterval[1] - valDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            Xv,Yv = dataGen.genSamples_I(nrSamples = valDataInterval[1] - valDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
     
-            Xt,Yt = genSamples_I(nrSamples = testDataInterval[1] - testDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
+            Xt,Yt = dataGen.genSamples_I(nrSamples = testDataInterval[1] - testDataInterval[0], fromGenome_b = 1, genomeFileName = randomGenomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, convertToPict_b = convertToPict_b, flankSize = customFlankSize, augmentWithRevComplementary_b = augmentWithRevComplementary_b, getFrq_b = 0)
             
     
         else: #fetch the data from an appropriate source
@@ -677,12 +743,12 @@ def allInOne_ConvModel(bigLoopsNr = 1,
             tname=root + r"test.dat"
         
             
-            X,Y = getData2(fname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = trainDataInterval, outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)  
+            X,Y = dataGen.getData2(fname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = trainDataInterval, outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)  
             sizeInput = X.shape[1]
                     
-            Xv,Yv = getData2(vname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = valDataInterval , outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)      
+            Xv,Yv = dataGen.getData2(vname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = valDataInterval , outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)      
                 
-            Xt,Yt = getData2(tname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = testDataInterval, outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)  
+            Xt,Yt = dataGen.getData2(tname, letterShape, sizeOutput, convertToPict_b = convertToPict_b, loadRecsInterval = testDataInterval, outputType=float, augmentWithRevComplementary_b = augmentWithRevComplementary_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, customFlankSize_b = customFlankSize_b, customFlankSize = customFlankSize)  
         
         
         batch_size = min(batchSize,max(1,len(X)/20))
@@ -933,40 +999,7 @@ def allInOneWithDynSampling_ConvModel_I_testOnly(nrOuterLoops = 1,
         rootOutput = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/results_nets/"
 
 
-            
-#1st version parameters:    
-#    lengthWindows = 5, 7, 10, 15, 20, 25
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 30, 20, 10
-    
-#2nd version parameter:
-#    lengthWindows = 3, 5, 7
-#    nrHiddenUnits = 25
-#    nrFilters = 25, 15, 10
-      
-##3rd version parameter:
-#    lengthWindows = 3, 3
-#    nrHiddenUnits = 25
-#    nrFilters = 10, 5
-     
-#    lengthWindows = 3, 3, 4, 6, 8, 10, 15, 20, 30
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 45, 40, 30, 25, 20, 15
-     
-     
-    
-    #Using the getData-fct to fetch data:
-#    fname=root + r"trShort.dat"
-#    tname=root + r"tsShort.dat"
-#    vname=root + r"vlShort.dat"
-#      
-#    X,Y = dnaNet.getData2(fname, letterShape, sizeOutput, outputType=float)  
-#    sizeInputput = X.shape[1] 
-#        
-#    Xt,Yt = dnaNet.getData2(tname, letterShape, sizeOutput , outputType=float)  
-#    
-#    
-    
+                
     
     #repeat a training/testing round the set nr of times; after first round the model (from the previous round) is reloaded
     lTrainDataInterval = trainDataInterval[1] - trainDataInterval[0]
@@ -1057,7 +1090,7 @@ def allInOneWithDynSampling_ConvModel_I_testOnly(nrOuterLoops = 1,
 #            frqModelDict = {}   
 #            if inclFrqModel_b == 1:
 #                    
-#                frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
+#                frqModelDict = frqM.getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
 #                         
 #            
 #            #Dynamically fetch small sample batches; this runs in an infinite loop
@@ -1228,7 +1261,7 @@ def allInOneWithDynSampling_ConvModel_I_testOnly(nrOuterLoops = 1,
     
             #Read in the test data we avoid the chromos used for training:    
             avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-            Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
+            Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
                                                     flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
     
             if insertFrqModel_b != 1:
@@ -1256,14 +1289,14 @@ def allInOneWithDynSampling_ConvModel_I_testOnly(nrOuterLoops = 1,
     
             #Read in the test data we avoid the chromos used for training:    
             avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-            Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
+            Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
             if Xt.shape[0] < nrTestSamples:
                 m = 1
                 while Xt.shape[0] < nrTestSamples:
                     
                     testDataInterval = [(n+1 +m)*lTrainDataInterval, (n+1+m)*lTrainDataInterval + nrTestSamples]
                     print("Too few samples in testDataInterval so consider new interval: ", testDataInterval)
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
+                    Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
        
         #when if augmentWithRevComplementary_b == 1 the generated batches contain 2*batchSize samples:
         if augmentWithRevComplementary_b == 0:
@@ -1470,39 +1503,6 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
         rootOutput = r"C:/Users/Christian/Bioinformatics/various_python/theano/DNA_proj/results_nets/"
 
 
-            
-#1st version parameters:    
-#    lengthWindows = 5, 7, 10, 15, 20, 25
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 30, 20, 10
-    
-#2nd version parameter:
-#    lengthWindows = 3, 5, 7
-#    nrHiddenUnits = 25
-#    nrFilters = 25, 15, 10
-      
-##3rd version parameter:
-#    lengthWindows = 3, 3
-#    nrHiddenUnits = 25
-#    nrFilters = 10, 5
-     
-#    lengthWindows = 3, 3, 4, 6, 8, 10, 15, 20, 30
-#    nrHiddenUnits = 25
-#    nrFilters = 50, 45, 40, 45, 40, 30, 25, 20, 15
-     
-     
-    
-    #Using the getData-fct to fetch data:
-#    fname=root + r"trShort.dat"
-#    tname=root + r"tsShort.dat"
-#    vname=root + r"vlShort.dat"
-#      
-#    X,Y = dnaNet.getData2(fname, letterShape, sizeOutput, outputType=float)  
-#    sizeInputput = X.shape[1] 
-#        
-#    Xt,Yt = dnaNet.getData2(tname, letterShape, sizeOutput , outputType=float)  
-#    
-#    
     
     
     #repeat a training/testing round the set nr of times; after first round the model (from the previous round) is reloaded
@@ -1554,11 +1554,11 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
                 
                 #read in the genome sequence:
                 if onlyOneRandomChromo_b == 0: #the whole genome seq will be read in (chromo's concatenated, if any)
-                    genomeArray, repeatArray, exonicArray, genomeString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName , startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 0)
+                    genomeArray, repeatArray, exonicArray, genomeString = dataGen.encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName , startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 0)
                     lGenome = len(genomeArray)
                     genomeSeqSourceTrain = 'Read data from whole genome (chromo\'s concatenated, if any)'
                 elif onlyOneRandomChromo_b == 1: #only the genome seq for one randomly chosen chromo (not in avoidChromo's list) will be read in:
-                    genomeDictArray, repeatInfoDictArray, exonicInfoDictArray, genomeDictString = encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName ,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 1)
+                    genomeDictArray, repeatInfoDictArray, exonicInfoDictArray, genomeDictString = dataGen.encodeGenome(fileName = genomeFileName, exonicInfoBinaryFileName  = exonicInfoBinaryFileName ,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = outputEncodedOneHot_b, outputEncodedInt_b = outputEncodedInt_b, outputAsDict_b = 1)
                     if len(genomeDictArray.keys()) > 1:
                         print("Warning: more than one chromosome has been selected")
                     chromo = genomeDictArray.keys()[0]
@@ -1615,7 +1615,7 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
             frqModelDict = {}   
             if inclFrqModel_b == 1:
                     
-                frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
+                frqModelDict = frqM.getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
                          
             
             #Dynamically fetch small sample batches; this runs in an infinite loop
@@ -1677,13 +1677,13 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
                         
     #                    print "I'm using the generator transform style"
                     
-                        X,Y = genSamplesForDynamicSampling_I(transformStyle_b = dynSamplesTransformStyle_b, nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
+                        X,Y = dataGen.genSamplesForDynamicSampling_I(transformStyle_b = dynSamplesTransformStyle_b, nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
                                                            genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
     
     
                     elif dynSamplesTransformStyle_b == 1:
                         
-                        X,Y = genSamplesForDynamicSampling_I(transformStyle_b = dynSamplesTransformStyle_b, X = X, Y = Y, nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
+                        X,Y = dataGen.genSamplesForDynamicSampling_I(transformStyle_b = dynSamplesTransformStyle_b, X = X, Y = Y, nrSamples = batchSize, genomeArray = genomeArray, repeatArray = repeatArray, exonicArray = exonicArray, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
                                                            genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
                         
     
@@ -1890,7 +1890,7 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
         
                     #Read in the test data we avoid the chromos used for training:    
                     avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
+                    Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, inclFrqModel_b = inclFrqModel_b,
                                                             flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
             
                     if insertFrqModel_b != 1:
@@ -1918,7 +1918,7 @@ def allInOneWithDynSampling_ConvModel_I(nrOuterLoops = 1,
             
                     #Read in the test data we avoid the chromos used for training:    
                     avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-                    Xt,Yt, genomeSeqSourceTest = genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
+                    Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_I(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName,  outputEncodedOneHot_b = outputEncodedOneHot_b, labelsCodetype = labelsCodetype, outputEncodedInt_b = outputEncodedInt_b,  onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1],  flankSize = customFlankSize, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)
                
                           
         
@@ -2198,11 +2198,11 @@ def allInOneWithDynSampling_ConvModel_II(
             
             #read in the genome sequence:
             if onlyOneRandomChromo_b == 0: #the whole genome seq will be read in (chromo's concatenated, if any)
-                genomeArray, repeatInfoArray, genomeString = encodeGenome(genomeFileName, startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = 1, outputEncodedInt_b = 0, outputAsDict_b = 0)
+                genomeArray, repeatInfoArray, genomeString = dataGen.encodeGenome(genomeFileName, startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = 1, outputEncodedInt_b = 0, outputAsDict_b = 0)
                 lGenome = len(genomeArray)
                 genomeSeqSourceTrain = 'Read data from whole genome (chromo\'s concatenated, if any)'
             elif onlyOneRandomChromo_b == 1: #only the genome seq for one randomly chosen chromo (not in avoidChromo's list) will be read in:
-                genomeDictArray, repeatInfoDictArray, genomeDictString = encodeGenome(genomeFileName,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = 1, outputEncodedInt_b = 0, outputAsDict_b = 1)
+                genomeDictArray, repeatInfoDictArray, genomeDictString = dataGen.encodeGenome(genomeFileName,  startAtPosition = startAtPosition, endAtPosition = endAtPosition, outputGenomeString_b = 1, outputEncoded_b = 1, outputEncodedOneHot_b = 1, outputEncodedInt_b = 0, outputAsDict_b = 1)
                 if len(genomeDictArray.keys()) > 1:
                     print("Warning: more than one chromosome has been selected")
                 chromo = genomeDictArray.keys()[0]
@@ -2232,7 +2232,7 @@ def allInOneWithDynSampling_ConvModel_II(
         #the training is done (below) so as to avoid spending the memory needed for the test data during 
         #the training part: 
         frqModelDict = {}   
-        frqModelDict = getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
+        frqModelDict = frqM.getResultsFrqModel(fileName = frqModelFileName, flankSize = flankSizeFrqModel, applySoftmax_b = frqSoftmaxed_b)          
                      
         
         #Dynamically fetch small sample batches; this runs in an infinite loop
@@ -2268,13 +2268,13 @@ def allInOneWithDynSampling_ConvModel_II(
                     
 #                    print "I'm using the generator transform style"
                 
-                    X,Y = genSamplesForDynamicSampling_II(transformStyle_b = dynSamplesTransformStyle_b, nrSamples = batchSize, genomeArray = genomeArray, flankSize = customFlankSize, 
+                    X,Y = dataGen.genSamplesForDynamicSampling_II(transformStyle_b = dynSamplesTransformStyle_b, nrSamples = batchSize, genomeArray = genomeArray, flankSize = customFlankSize, 
                                                        genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, labelSize = sizeOutput, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
 
 
                 elif dynSamplesTransformStyle_b == 1:
                     
-                    X,Y = genSamplesForDynamicSampling_II(transformStyle_b = dynSamplesTransformStyle_b, X = X, Y = Y, nrSamples = batchSize, genomeArray = genomeArray, flankSize = customFlankSize, 
+                    X,Y = dataGen.genSamplesForDynamicSampling_II(transformStyle_b = dynSamplesTransformStyle_b, X = X, Y = Y, nrSamples = batchSize, genomeArray = genomeArray, flankSize = customFlankSize, 
                                                        genomeString = genomeString, frqModelDict = frqModelDict, flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, labelSize = sizeOutput, shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentWithRevComplementary_b)
                     
 
@@ -2373,7 +2373,7 @@ def allInOneWithDynSampling_ConvModel_II(
 
     #Read in the test data we avoid the chromos used for training:    
     avoidChromo.append(genomeSeqSourceTrain) ##to avoid getting test data from the same chromo as the training and validation data 
-    Xt,Yt, genomeSeqSourceTest = genSamples_II(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, 
+    Xt,Yt, genomeSeqSourceTest = dataGen.genSamples_II(fromGenome_b = fromGenome_b, genomeFileName = genomeFileName, flankSize = customFlankSize, 
                                             flankSizeFrqModel = flankSizeFrqModel, exclFrqModelFlanks_b = exclFrqModelFlanks_b, frqModelDict = frqModelDict, onlyOneRandomChromo_b = onlyOneRandomChromo_b , avoidChromo = avoidChromo, nrSamples = nrTestSamples, startAtPosition = testDataInterval[0], endAtPosition = testDataInterval[1], shuffle_b = shuffle_b , inner_b = inner_b, shuffleLength = shuffleLength, augmentWithRevComplementary_b = augmentTestDataWithRevComplementary_b, getFrq_b = 0)        
         
     score, acc = net.evaluate(Xt, Yt, batch_size=batch_size, verbose=1)

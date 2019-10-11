@@ -456,6 +456,215 @@ def makeConv1DLSTMmodel(sequenceLength, letterShape, lengthWindows, nrFilters, f
     return model
 
 
+def makeConv1DLSTMmodelFusedWithFrqModel(frqModelOutputSize,
+                                         sequenceLength, 
+                                         letterShape, 
+                                         lengthWindows, 
+                                         nrFilters, 
+                                         filterStride = 1, 
+                                         onlyConv_b = 0, 
+                                         nrOfParallelLSTMstacks = 1, 
+                                         finalDenseLayers_b = 0, 
+                                         sizeHidden = [10], 
+                                         paddingType = 'valid', 
+                                         outputSize = 4,  
+                                         pool_b = 0, 
+                                         maxPooling_b = 0, 
+                                         poolAt = [2], 
+                                         dropoutConvLayers_b = 1, 
+                                         dropoutVal = 0.25, 
+                                         return_sequences=False, 
+                                         stateful=False, 
+                                         tryAveraging_b = 0):
+    '''
+    network model
+    flankSize = lenght of the flanking sequence (number of letters)
+    letterShape = shape of letter encoding, here arrays of length 4
+    lengthWindows = list of window lengths of the sliding windows in the cnn (order determines the layers)
+    nrFilters =  list of the sizes of the outputs of each cnn layer, the "features" (ordered as the layers, ie corr to the lengthWindows list)
+    sizeHidden = the size of the final dense layer (if finalDenseLayer_b = 1)
+    outputSize = the size of the output layer, here 4
+    '''
+
+    print('Build Conv1d plus LSTM model fused with frq-model ... ')    
+    
+
+    inputsFrqModel = Input(shape=(frqModelOutputSize,letterShape))
+
+    inputs_left = Input(shape=(sequenceLength,letterShape))
+    inputs_right = Input(shape=(sequenceLength,letterShape))
+
+    print("First the 1d-convo, ba ...")
+
+    convOutLeft = Conv1D(kernel_size=lengthWindows[0], strides=filterStride, filters=nrFilters[0], padding=paddingType, activation='relu')(inputs_left)
+    convOutRight = Conv1D(kernel_size=lengthWindows[0], strides=filterStride, filters=nrFilters[0], padding=paddingType, activation='relu')(inputs_right)
+
+    if pool_b == 1 and poolAt.count(0) > 0:
+        if maxPooling_b == 1:
+            convOutLeft = MaxPooling1D(convOutLeft)
+            convOutRight = MaxPooling1D(convOutRight)
+        else:
+            convOutLeft = AveragePooling1D(convOutLeft)
+            convOutRight = AveragePooling1D(convOutRight)
+
+    if dropoutConvLayers_b ==  1:
+        
+        convOutLeft = Dropout(dropoutVal)(convOutLeft)
+        convOutRight = Dropout(dropoutVal)(convOutRight)
+        
+    print("Left-hand shape after 1st convo ", convOutLeft._keras_shape)
+    print("Right-hand shape after 1st convo ",convOutRight._keras_shape)
+
+    
+    for i in range(len(nrFilters)-1):    
+    
+        convOutLeft = Conv1D(kernel_size=lengthWindows[i+1], strides=filterStride, filters=nrFilters[i+1], padding=paddingType, activation='relu')(convOutLeft)
+        convOutRight = Conv1D(kernel_size=lengthWindows[i+1], strides=filterStride, filters=nrFilters[i+1], padding=paddingType, activation='relu')(convOutRight)
+
+        if pool_b == 1  and poolAt.count(i+1) > 0:
+            if maxPooling_b == 1:
+                convOutLeft = MaxPooling1D(convOutLeft)
+                convOutRight = MaxPooling1D(convOutRight)
+            else:
+                convOutLeft = AveragePooling1D(convOutLeft)
+                convOutRight = AveragePooling1D(convOutRight)
+                
+                
+        if dropoutConvLayers_b ==  1:
+        
+            convOutLeft = Dropout(dropoutVal)(convOutLeft)
+            convOutRight = Dropout(dropoutVal)(convOutRight)
+            
+        print(convOutLeft._keras_shape)
+        print(convOutRight._keras_shape)
+
+
+    print("...by!")
+    
+    
+    
+    print("Left-hand shape after all convo's ",convOutLeft._keras_shape)
+    print("Right-hand shape after all convo's ", convOutRight._keras_shape)
+    
+    
+    if onlyConv_b == 1:
+        
+        flattenLeft = Reshape((-1,))(convOutLeft)
+        print(flattenLeft._keras_shape)
+        flattenRight = Reshape((-1,))(convOutRight)
+        print(flattenRight._keras_shape)
+        leftAndRight = concatenate([flattenLeft, flattenRight], axis = -1) 
+        
+    else:
+        
+        print("Then the lstm part ..." )
+    
+    #    lstm_left_1  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutLeft)
+    #    lstm_right_1 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutRight)
+    #
+    #    print(lstm_left_1._keras_shape)
+    #    print (lstm_right_1._keras_shape)
+    #
+    #    #Concatenate the two LSTM-outputs:
+    #    leftAndRight = concatenate([lstm_left_1, lstm_right_1], axis=-1)
+    
+        for j in range(nrOfParallelLSTMstacks):
+    
+            lstm_left_1  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(convOutLeft)
+            lstm_right_1 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(convOutRight)
+        
+            print("Left-hand shape after 1st LSTM ", lstm_left_1._keras_shape)
+            print("Right-hand shape after 1st LSTM ",lstm_right_1._keras_shape)
+            
+            
+        #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)
+        #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
+        #
+        #    print(lstm_left_2._keras_shape)
+        #    print (lstm_right_2._keras_shape)
+        
+            if tryAveraging_b == 1:
+                
+                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_left_1)  
+                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=True, stateful=stateful)(lstm_right_1)
+                
+#                lstm_left_2 = GlobalAveragePooling1D()(lstm_left_2)
+#                lstm_right_2 = GlobalAveragePooling1D()(lstm_right_2)
+                lstm_left_2 = Conv1D(kernel_size=10, strides=filterStride, filters=100, padding=paddingType, activation='relu')(lstm_left_2)
+                lstm_right_2 = Conv1D(kernel_size=10, strides=filterStride, filters=100, padding=paddingType, activation='relu')(lstm_right_2)
+
+                lstm_left_2 = Conv1D(kernel_size=10, strides=filterStride, filters=10, padding=paddingType, activation='relu')(lstm_left_2)
+                lstm_right_2 = Conv1D(kernel_size=10, strides=filterStride, filters=10, padding=paddingType, activation='relu')(lstm_right_2)
+                
+                lstm_left_2 = Reshape((-1,))(lstm_left_2)
+                lstm_right_2 = Reshape((-1,))(lstm_right_2)
+
+                
+            else:
+                
+                lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_left_1)  
+                lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(lstm_right_1)
+            
+        #    lstm_left_2  = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutLeft)
+        #    lstm_right_2 = LSTM(nrFilters[::-1][0], return_sequences=False, stateful=stateful)(convOutRight)
+            
+        
+            print("Left-hand shape after 2nd LSTM ",lstm_left_2._keras_shape)
+            print ("Right-hand shape after 2nd LSTM ", lstm_right_2._keras_shape)
+            
+            #Concatenate the two LSTM-outputs:
+            leftAndRight_j = concatenate([lstm_left_2, lstm_right_2], axis=-1)
+            
+            if j == 0:
+                
+                leftAndRight = leftAndRight_j
+                
+            else: 
+                
+                leftAndRight = concatenate([leftAndRight, leftAndRight_j], axis = -1) 
+                
+        
+            print("Shape of concatenated LSTM output ", leftAndRight._keras_shape)
+            
+        
+        print("Shape of LSTM-stacks output ", leftAndRight._keras_shape)
+    
+    if finalDenseLayers_b == 1:
+        
+        nrDenseLayers = len(sizeHidden)
+        for i in range(nrDenseLayers):
+            
+            leftAndRight = Dense(sizeHidden[i], activation='relu')(leftAndRight)
+            
+    print("Shape after final dense layer ", leftAndRight._keras_shape)
+    
+    
+    print("Finally, merge in the output from the frq-model")
+    #Merge in the output from the frq model:
+    reshapedInputsFrqModel = Reshape((-1,))(inputsFrqModel)
+    print(reshapedInputsFrqModel._keras_shape)
+    
+    merge_outputs = Concatenate()([reshapedInputsFrqModel, leftAndRight])
+    print(merge_outputs._keras_shape)
+        
+    features = Reshape((-1,))(merge_outputs)
+    print(features._keras_shape)
+
+
+    # And add a softmax on top
+    prediction = Dense(outputSize, activation='softmax')(features)
+
+    print("Output shape ", prediction._keras_shape)
+
+    model = Model(inputs=[inputs_left, inputs_right], outputs=prediction)
+
+    print("... Model's build.")
+    
+    return model
+    
+    
+
+
 #to define layer in makeConv1DLSTMmodelFusedWithEROmodel, which consists in 
 #scaling the output tensors from parallel LSTM by the output of an ExonicRepeatOther-model
 #and summing the components:
@@ -1107,6 +1316,7 @@ def getGenerator(batchSize = -1,
 
 
 def buildModel(convLayers_b = False,
+               inclFrqModel_b = False,
                 fusedWitEROmodel_b = False,
                 eroModelFileName = None,
                 dropout_b = False,
@@ -1158,6 +1368,13 @@ def buildModel(convLayers_b = False,
         elif onlyConv_b == 1 and leftRight_b != 1:
             net = makeConv1Dmodel(sequenceLength = sizeInput, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, hiddenUnits = hiddenUnits, outputSize = outputSize, padding = padding, pool_b = pool_b, poolStrides = poolStrides, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutVal = dropoutVal, dropoutLastLayer_b = dropoutLastLayer_b)
             usedThisModel = 'makeConv1Dmodel'
+
+    elif convLayers_b > 0 and fusedWitEROmodel_b == 0 and inclFrqModel_b == 1:
+                    
+        if onlyConv_b != 1 or (onlyConv_b == 1 and leftRight_b == 1):
+        
+            net = makeConv1DLSTMmodelFusedWithFrqModel(frqModelOutputSize = 1, sequenceLength = sequenceLength, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, onlyConv_b = onlyConv_b, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = outputSize,  tryAveraging_b = tryAveraging_b, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
+            usedThisModel = 'makeConv1DLSTMmodelFusedWithFrqModel'
         
     elif fusedWitEROmodel_b == 1:
         eroModel = model_from_json(open(eroModelFileName).read())
@@ -1165,6 +1382,7 @@ def buildModel(convLayers_b = False,
         
         net = makeConv1DLSTMmodelFusedWithEROmodel(eroModel = eroModel, sequenceLength = sequenceLength, letterShape = letterShape, lengthWindows = lengthWindows, nrFilters= nrFilters, filterStride = filterStride, nrOfParallelLSTMstacks = nrOfParallelLSTMstacks, finalDenseLayers_b = finalDenseLayers_b, sizeHidden = hiddenUnits, outputSize = outputSize,  batchSize = batchSize, pool_b = pool_b, maxPooling_b = maxPooling_b, poolAt = poolAt, dropoutConvLayers_b = dropout_b, dropoutVal = dropoutVal )
         usedThisModel = 'makeConv1DLSTMmodelFusedWithEROmodel'
+        
         
     net.summary()
     plot_model(net, to_file= rootOutput + modelName + '_plot.png', show_shapes=True, show_layer_names=True)
@@ -1370,7 +1588,8 @@ def allInOneWithDynSampling_ConvLSTMmodel(nrOuterLoops = 1,
     Build and compile the model outside the mainloop
     '''
     sequenceLength = customFlankSize + overlap
-    net, useThisModel = buildModel(convLayers_b = convLayers_b,
+    net, useThisModel = buildModel(convLayers_b = convLayers_b, 
+                                   inclFrqModel_b = inclFrqModel_b,
                 fusedWitEROmodel_b = fusedWitEROmodel_b,
                 eroModelFileName = eroModelFileName,
                 dropout_b = dropout_b,

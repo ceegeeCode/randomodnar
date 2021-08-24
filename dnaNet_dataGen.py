@@ -94,26 +94,29 @@ thus "extra" pieces of sequence in the assembly could be read in in addition to 
 the chromosomes. While unintentional this should not do any harm, since it is all valid sequence. 
 For human and yeast this did not happen (only full chromosome sequences were in the
 genome files); for zebrafish there was also no effect since only the first 2 billion bases were read in
-and these all belonged to full chromosomal seqeunces. For mouse the training used the first 3 billion 
+and these all belonged to full chromosomal seqeunces. For mouse the training used 3 billion 
 bases, which happened to consist of all the chromosomal sequences and (maybe) an additional about 5 million 
-bases worth of shorter sequences were read in, or a part of it.
+bases worth of shorter sequences were read in, or a part of it. For drosophila also some extra
+sequence from the build was read in and sampled from in the training, and which can have had an effect
+on the parameters (which I though expect to have very little impact on the performance of the trained
+model). 
 
-More details, difference means diff between results of using the new version and the _v1 version: 
+Mored detailed, difference means diff between results of using the new version and the _v1 version: 
 1) human hg38: no differences (pre-filtered the assembly)
 2) mouse m38: only diff's in Y chromo; can have a small effect on training (not really 
 erroneous, only an extra about 4-5 million bases appended); for predictions only autosomals 
-were used 
+were used (no diff's there) 
 3) yeast: no diff's
-4) for drosophila: _v1 added bases to the last chromo read in (X); no diff's implied since
-only used first 150 million was used for training and only autosomals for prediction
-(and the single chrom seq's were read in with chromoNameBound = 1000)
+4) for drosophila: with _v1 some extra sequence was added to the chromosomes (2L/R)
+why the prediction was rerun (with the new version); the change in accuracy upon this change
+was less than 1 pct point.
 5) for zebrafish: no diff's for training since first 2 billion bases used (and these
 sit in autosomals read in first); for single chromo seq's no diff's found 
-(were read in with chromoNameBound = 1000) so no implications for predictions
+(were read in with chromoNameBound = 1000) so no implications for the predictions
 6) For mouse, human and yeast the individual chromosome sequences obtained by the _v1 
 versions were checked against direct downloads of the chromo seq's from UCSC and 
-only very few diff's were seen (no diffs in mouse, yeast; less than 50 in each human chromo
-and typically less if any; table in Suppl Data check
+only very few diff's were seen (no diffs in mouse, yeast; less than 50 bases in each human 
+chromo and typically less if any; table in Suppl Data and data check).
 
 ---------------------------------------------------------------------------------------------
 

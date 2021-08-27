@@ -5190,7 +5190,7 @@ def getAccuracyOnSegments(rootOutput,
 #            avgPredSeg = storedPredThisSeg
             print i, avgPredSeg.shape
 #            print avgPredSeg[100000:101000]
-#            raw_input("Sidsel er den dejligste")
+#            raw_input("S er den dejligste")
             
             
             #get the qualified array too:
@@ -6528,7 +6528,7 @@ def computeFourierOnSegments(rootInput,
     #            avgPredSeg = storedPredThisSeg
                 print i, avgPredSeg.shape
     #            print avgPredSeg[100000:101000]
-    #            raw_input("Sidsel er den dejligste")
+    #            raw_input("S er den dejligste")
                 
                 #we need the qualified array:
                 loadFileQual = rootInput + modelFileName + '_' + 'qualifiedArray' + '_' + genomeIdNameSeg + '_avgRevCompl' + str(averageRevComplementary_b)

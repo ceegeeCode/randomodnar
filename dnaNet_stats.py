@@ -5913,11 +5913,10 @@ def displaceIntervalsInSegments(inputArray, intervalsDict, segmentId, chromoName
     inputArray: an array of floats/ints, typically a segment (segmentId) of prediction-prob's
     intervalsDict: as output by rndDisplaceAnnoIntervalsInSegments; must be obtained
     on the same chromosome as the inputArray.
-    
-    Obs: this function returns a changed version of the inputArray; the code could be
-    written using copying of the inputArray but in the present version this is not 
-    done (to avoid a possible memory-footprint from copying). 
     '''
+#    ''' Obs: this function returns a changed version of the inputArray; the code could be
+#    written using copying of the inputArray but in the present version this is not 
+#    done (to avoid a possible memory-footprint from copying). '''
     
     inputArrayCopy = inputArray.copy()
         
@@ -5955,7 +5954,7 @@ def displaceIntervalsInSegments(inputArray, intervalsDict, segmentId, chromoName
             raw_input("Den prikkede ...")       
     
 #    print np.sum(np.abs(inputArrayCopy - inputArray))
-#    raw_input("Den stor prikkede ...") 
+#    raw_input("Den storprikkede ...") 
     
     return inputArrayCopy
         
@@ -5983,8 +5982,8 @@ def computeFourierOnSegments(rootInput,
                              nPeak = 4500, #optional; for getting inv transform for coeff's in peak 
                              shuffle_b = 0,
                              randomizeDisqualified_b = 0,
-                             randomizePositions_b = 0, #whiten a window around each position specified in positionsDict 
-                             whiteningMultiplicative_b = 0,
+                             randomizePositions_b = 0, #randomize a window around each position specified in positionsDict 
+                             randomizingMultiplicative_b = 0,
                              positionsDict = {},
                              randomizeAnnoIntervals_b = 0,
                              randomizeAnnoIntervalsName = '',
@@ -6010,7 +6009,7 @@ def computeFourierOnSegments(rootInput,
                     input arrays are taken to be the predReturns; if 1 the reference base
                     probabilities are used (ie the predArrays dotted by the labelArrays)
     
-    whiteningMultiplicative_b: if 1 the inout arrays will be whitened by multiplying with a random float in [0,1], else by replacing by such a value
+    randomizingMultiplicative_b: if 1 the inout arrays will be randomized by multiplying with a random float in [0,1], else by replacing by such a value
     
     randomizeAnnoIntervals_b: only works for a single chromosme at a time. 
     randomizeAnnoIntervalsDict: as output by rndDisplaceAnnoIntervalsInSegments (single chromo)
@@ -6029,12 +6028,12 @@ def computeFourierOnSegments(rootInput,
         raw_input("I'll shuffle the input arrays!")
         
     if randomizeDisqualified_b == 1:
-        raw_input("I'll whiten the disqualified part of the input arrays!")
+        raw_input("I'll randomize the disqualified part of the input arrays!")
         
     if randomizePositions_b == 1:
-        raw_input("I'll whiten windows around the provided positions of the input arrays!")
+        raw_input("I'll randomize windows around the provided positions of the input arrays!")
         
-    if whiteningMultiplicative_b == 1:
+    if randomizingMultiplicative_b == 1:
         randomizePositionsName  = randomizePositionsName + '_multiplicative'  
         
     if randomizeAnnoIntervals_b == 1:
@@ -6157,37 +6156,37 @@ def computeFourierOnSegments(rootInput,
                 disQidxs = np.where(qualArraySeg == 0)[0]
                 print "disQidxs ", disQidxs
                 
-                print "Before whitening ", avgPredSeg.take(disQidxs) 
+                print "Before randomizing ", avgPredSeg.take(disQidxs) 
 #                if len(disQidxs) > 1: print "Gylle ", avgPredSeg[disQidxs[0]:(disQidxs[1] + 1)]
                 for idx in disQidxs:
                     
                     avgPredSeg[idx] = np.random.random(1)*0.1 + 0.25 #random flot in [0,1), which is fine
                 
-                print "After whitening ", avgPredSeg.take(disQidxs) 
+                print "After randomizing ", avgPredSeg.take(disQidxs) 
                 
             if randomizePositions_b == 1: 
                 
                 #get indices for this chromo and segment:
                 idxs = positionsDict[genomeIdName][i]
-                print "I'll whiten at ", idxs
+                print "I'll randomize at ", idxs
                 
-                print "before whitening ", avgPredSeg.take(idxs)
-                #whiten:
+                print "before randomizing ", avgPredSeg.take(idxs)
+                #randomize:
                 for idx in idxs:
 
                     intervalStart = max(idx - randomizePositionsWindow, 0)
                     intervalEnd = min(idx + randomizePositionsWindow, segmentLength)                    
                     try:                    
-                        if whiteningMultiplicative_b == 1:
+                        if randomizingMultiplicative_b == 1:
                             for j in range(intervalStart, intervalEnd+1):
                                 avgPredSeg[j] = np.random.random(1)*avgPredSeg[j]
                         else:
                             for j in range(intervalStart, intervalEnd+1):
                                 avgPredSeg[j] = np.random.random(1)
                     except IndexError:
-                        print "When whitening postions: Index error at idx", idx
+                        print "When randomizing postions: Index error at idx", idx
                         continue
-                print "after whitening ", avgPredSeg.take(idxs)
+                print "after randomizing ", avgPredSeg.take(idxs)
                 
             
             if randomizeAnnoIntervals_b == 1:
@@ -6600,39 +6599,39 @@ def computeFourierOnSegments(rootInput,
                 #indices of non-qual's:
                 disQidxs = np.where(qualArraySeg == 0)[0]
                 
-                print "Before whitening ", avgPredSeg.take(disQidxs) 
+                print "Before randomizing ", avgPredSeg.take(disQidxs) 
                 if len(disQidxs) > 1: print "Gylle ", avgPredSeg[disQidxs[0]:(disQidxs[1] + 1)]
                 for idx in disQidxs:
                     
                     avgPredSeg[idx] = np.random.random(1)*0.1 + 0.25 #random float in [0,1), which is fine
                 
-                print "After whitening ", avgPredSeg.take(disQidxs) 
+                print "After randomizing ", avgPredSeg.take(disQidxs) 
                 
             
             if randomizePositions_b == 1: 
                 
                 #get indices for this chromo and segment:
                 idxs = positionsDict[genomeIdName][i]
-                print "I'll whiten at ", idxs
+                print "I'll randomize at ", idxs
                 
-                print "before whitening ", avgPredSeg.take(idxs)
-                #whiten:
+                print "before randomizing ", avgPredSeg.take(idxs)
+                #randomize:
                 for idx in idxs:
     
                     intervalStart = max(idx - randomizePositionsWindow, 0)
                     intervalEnd = min(idx + randomizePositionsWindow, segmentLength)
                     try:
-                        if whiteningMultiplicative_b == 1:
+                        if randomizingMultiplicative_b == 1:
                             for j in range(intervalStart, intervalEnd+1):
                                 avgPredSeg[j] = np.random.random(1)*avgPredSeg[j]
                         else:
                             for j in range(intervalStart, intervalEnd+1):
                                 avgPredSeg[j] = np.random.random(1)
                     except IndexError:
-                        print "When whitening positions: Index error at idx", idx
+                        print "When randomizing positions: Index error at idx", idx
                         continue
                         
-                print "after whitening ", avgPredSeg.take(idxs)
+                print "after randomizing ", avgPredSeg.take(idxs)
                         
             
             if randomizeAnnoIntervals_b == 1:
@@ -6975,8 +6974,8 @@ def computeFourierChromosomes(chromosomeOrderList,
                          nPeak = 4500,
                          shuffle_b = 0,
                          randomizeDisqualified_b = 0,
-                         randomizePositions_b = 0, #whiten a window around each position specified in positionsDict 
-                         whiteningMultiplicative_b = 0,
+                         randomizePositions_b = 0, #randomize a window around each position specified in positionsDict 
+                         randomizingMultiplicative_b = 0,
                          positionsDict = {},
                          randomizeAnnoIntervals_b = 0,
                          randomizeAnnoIntervalsName = '',
@@ -7052,7 +7051,7 @@ def computeFourierChromosomes(chromosomeOrderList,
                                      shuffle_b = shuffle_b,
                                      randomizeDisqualified_b = randomizeDisqualified_b,
                                      randomizePositions_b = randomizePositions_b,
-                                     whiteningMultiplicative_b = whiteningMultiplicative_b,
+                                     randomizingMultiplicative_b = randomizingMultiplicative_b,
                                      positionsDict = positionsDict,
                                      randomizeAnnoIntervals_b = randomizeAnnoIntervals_b,
                                      randomizeAnnoIntervalsName = randomizeAnnoIntervalsName,
@@ -7440,10 +7439,10 @@ def combineAnnotations(chromosomeOrderList, chromosomeDict , chromosomeLengthFil
  
     
 
-#util for obtaining a new set of annotation intervals from an existing dict of intervals for som
+#util for obtaining a new set of annotation intervals from an existing dict of intervals for some
 #annotation, by randomly displacing the intervals. Aimed at the Fourier transf:
 def rndDisplaceAnnoIntervalsInSegments(rootOutput, chromoName, annotationName, segmentLength, firstSegmentStart, rndPct):
-    '''Returns a dict maping each intervals's idx to its original (start,end) positions and
+    '''Returns a dict mapping each intervals's idx to its original (start,end) positions and
     a pair of new such positions.
     Only (about) rndPct pct of the intervals are displaced.'''
 
